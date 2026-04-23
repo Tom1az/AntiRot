@@ -4,7 +4,7 @@ from core.database import get_db
 import models
 import uuid
 from datetime import datetime
-from typing import List
+from typing import List, Any, Optional  # Thêm Optional vào đây
 from services.chat_engine import get_socratic_reply, generate_adaptive_quiz
 from services.dual_chat_engine import dual_agent_chat
 
