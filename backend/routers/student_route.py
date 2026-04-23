@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime
 from typing import List
 from services.chat_engine import get_socratic_reply, generate_adaptive_quiz
+from services.dual_chat_engine import dual_agent_chat
 
 student = APIRouter(prefix="/student", tags=["Student Interface"])
 
@@ -200,28 +201,33 @@ async def socratic_chat(data: dict = Body(...), db: Session = Depends(get_db)):
     topic = data.get('topic_name', 'General')
     
     try:
-        # Gọi hàm từ chat_engine.py
-        user_input_with_context = f"Chủ đề: {topic}. Câu hỏi: {student_msg}"
-        ai_response = await get_socratic_reply(history=[], user_input=user_input_with_context)
+        # Gọi Dual-Agent System (Agent 1 + Agent 2 validator)
+        result = await dual_agent_chat(user_message=student_msg, topic=topic)
 
-        # Lưu lịch sử vào Database
+        # Lưu lịch sử vào Database (kèm metadata dual-agent)
         new_chat = models.ChatSession(
             id=uuid.uuid4(),
             student_id=student_id,
             topic_name=topic,
             messages=[
                 {"role": "user", "content": student_msg},
-                {"role": "ai", "content": ai_response}
+                {"role": "ai", "content": result.reply}
             ],
-            ai_summary="Đang sử dụng chat_engine",
+            ai_summary=f"Agent: {result.agent_used} | Retries: {result.retry_count} | Score: {result.validation_score}",
+            agent_used=result.agent_used,
+            retry_count=result.retry_count,
+            validation_score=result.validation_score,
             created_at=datetime.now()
         )
         db.add(new_chat)
         db.commit()
         
         return {
-            "reply": ai_response,
-            "session_id": new_chat.id
+            "reply": result.reply,
+            "session_id": new_chat.id,
+            "agent_used": result.agent_used,
+            "retry_count": result.retry_count,
+            "validation_score": result.validation_score
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi kết nối Socratic Coach: {str(e)}")

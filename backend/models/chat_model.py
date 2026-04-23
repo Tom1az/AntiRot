@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
 import uuid
@@ -13,4 +13,10 @@ class ChatSession(Base):
     
     messages = Column(JSONB, default=[]) 
     ai_summary = Column(Text)
+    
+    # Dual-Agent metadata
+    agent_used = Column(String, default="agent_1")     # "agent_1" hoặc "agent_2"
+    retry_count = Column(Integer, default=0)            # Số lần Agent 1 phải thử lại (0-3)
+    validation_score = Column(Integer, default=0)       # Điểm chất lượng từ Agent 2 (0-100)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
