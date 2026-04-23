@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { postSocraticChat, getChatSessions, getStudentDashboard } from '@/services/apiClient';
+import { postSocraticChat, getChatSessions, getStudentDashboard, postTeacherChat } from '@/services/apiClient';
 import type { ChatSession } from '@/types/api';
 import { Send, Bot, User, Bookmark, BrainCircuit, Target, Clock, History, Loader2, AlertTriangle, Network } from 'lucide-react';
 
@@ -122,15 +122,7 @@ export default function ChatTutorPage() {
   };
 
   if (isTeacher) {
-    return (
-      <div className="flex items-center justify-center h-full text-slate-500">
-        <div className="text-center">
-          <Bot className="w-16 h-16 mx-auto mb-4 text-purple-300" />
-          <h2 className="text-xl font-bold text-slate-700">Teacher View: AI Tutor Logs</h2>
-          <p>Trang này hiện đang ở chế độ Học Sinh. Chế độ giáo viên có thể tra cứu lịch sử chat của học sinh.</p>
-        </div>
-      </div>
-    );
+    return <TeacherChat />;
   }
 
   // Initial loading state
@@ -308,6 +300,142 @@ export default function ChatTutorPage() {
 
       </div>
 
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TEACHER CHAT (PEDAGOGICAL ASSISTANT)
+// ---------------------------------------------------------------------------
+function TeacherChat() {
+  const { user } = useAuth();
+  const [inputText, setInputText] = useState('');
+  const [messages, setMessages] = useState<ChatMessage[]>([{
+    id: 'welcome',
+    sender: 'tutor',
+    text: `Chào Thầy/Cô ${user?.full_name || ''}! Tôi là Trợ lý Sư phạm AI. Thầy/Cô có câu hỏi nào về phương pháp giảng dạy, cách xử lý học sinh yếu kém hay chống lạm dụng AI không?`,
+    timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+  }]);
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSendMessage = async () => {
+    if (!inputText.trim() || isLoading) return;
+
+    const userText = inputText;
+    const newUserMsg: ChatMessage = {
+      id: Date.now().toString(),
+      sender: 'student', // Reuse 'student' logic for right alignment (it's the teacher in this case)
+      text: userText,
+      timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+    };
+    setMessages((prev) => [...prev, newUserMsg]);
+    setInputText('');
+    setIsLoading(true);
+
+    try {
+      const response = await postTeacherChat(userText);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString() + 'reply',
+          sender: 'tutor',
+          text: response.reply,
+          timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+        },
+      ]);
+    } catch (err: any) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `error-${Date.now()}`,
+          sender: 'tutor',
+          text: `⚠️ Lỗi: ${err.message}. Vui lòng thử lại.`,
+          timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex gap-6 h-full animate-in fade-in duration-500">
+      {/* LEFT: MAIN CHAT PANEL */}
+      <div className="flex-1 bg-white rounded-4xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white flex flex-col overflow-hidden max-w-5xl mx-auto">
+        {/* Chat Header */}
+        <div className="px-6 py-4 border-b flex justify-between items-center bg-white">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-indigo-100 rounded-full flex justify-center items-center">
+              <Bot className="w-6 h-6 text-indigo-600" />
+            </div>
+            <div>
+              <h1 className="font-bold text-slate-800 text-lg">Pedagogical Assistant</h1>
+              <p className="text-xs font-semibold text-green-500 flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Online
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Chat Messages */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
+          {messages.map((msg) => (
+            <div key={msg.id} className={`flex gap-4 ${msg.sender === 'student' ? 'flex-row-reverse' : ''}`}>
+              <div className={`w-8 h-8 rounded-full flex justify-center items-center shrink-0 ${msg.sender === 'student' ? 'bg-indigo-600 text-white' : 'bg-white shadow-sm border text-indigo-600'}`}>
+                {msg.sender === 'student' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+              </div>
+              <div className={`max-w-[70%] ${msg.sender === 'student' ? 'items-end' : 'items-start'} flex flex-col`}>
+                <div className={`px-5 py-3 rounded-2xl shadow-sm text-sm font-medium ${msg.sender === 'student' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-700 border border-slate-100 rounded-tl-none'}`}>
+                  {msg.text.split('\n').map((line, i) => (
+                    <span key={i}>{line}<br /></span>
+                  ))}
+                </div>
+                <span className="text-[10px] text-slate-400 font-bold mt-1 px-1">{msg.timestamp}</span>
+              </div>
+            </div>
+          ))}
+
+          {isLoading && (
+            <div className="flex gap-4">
+              <div className="w-8 h-8 rounded-full bg-white shadow-sm border text-indigo-600 flex justify-center items-center shrink-0">
+                <Bot className="w-4 h-4" />
+              </div>
+              <div className="bg-white px-5 py-3 rounded-2xl shadow-sm border border-slate-100 rounded-tl-none flex items-center gap-2">
+                <div className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input Area */}
+        <div className="p-4 bg-white border-t">
+          <div className="relative flex items-center">
+            <input
+              type="text"
+              className="w-full bg-slate-50 border-none rounded-full pl-6 pr-14 py-4 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-indigo-600 outline-none placeholder-slate-400"
+              placeholder="Hỏi AI về phương pháp sư phạm..."
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+            />
+            <button
+              onClick={handleSendMessage}
+              disabled={!inputText.trim() || isLoading}
+              className="absolute right-2 w-10 h-10 bg-indigo-600 text-white rounded-full flex justify-center items-center hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Send className="w-4 h-4 ml-1" />
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

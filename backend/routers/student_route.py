@@ -233,3 +233,15 @@ def get_recovery_plan(student_id: uuid.UUID, db: Session = Depends(get_db)):
         models.AiRecoveryPlan.student_id == student_id,
         models.AiRecoveryPlan.status == 'active'
     ).order_by(models.AiRecoveryPlan.created_at.desc()).first()
+
+# --- ASSIGNED QUIZZES FROM TEACHERS ---
+@student.get("/assigned-quizzes")
+def get_assigned_quizzes(grade: Optional[str] = None, db: Session = Depends(get_db)):
+    # Lấy tất cả quiz do giáo viên tạo, lọc theo lớp nếu có
+    query = db.query(models.TeacherQuiz)
+    if grade:
+        # Lọc những quiz cho lớp đó HOẶC những quiz không giới hạn lớp (target_grade is None)
+        query = query.filter((models.TeacherQuiz.target_grade == grade) | (models.TeacherQuiz.target_grade == None))
+    
+    quizzes = query.order_by(models.TeacherQuiz.created_at.desc()).all()
+    return quizzes

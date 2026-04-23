@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { searchStudents } from '@/services/apiClient';
+import { loginUser } from '@/services/apiClient';
 import type { User } from '@/types/api';
 import { Brain, Loader2, AlertTriangle, GraduationCap, BookOpen, Sparkles, LogIn, Lock, User as UserIcon } from 'lucide-react';
 
@@ -16,7 +16,6 @@ export default function LoginScreen() {
   // States
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [matchedUsers, setMatchedUsers] = useState<User[] | null>(null);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -27,42 +26,23 @@ export default function LoginScreen() {
 
     setLoading(true);
     setError(null);
-    setMatchedUsers(null);
 
     try {
-      if (role === 'teacher') {
-        // Mock Teacher Login
-        setTimeout(() => {
-            const teacherUser: User = {
-                id: 'teacher-demo',
-                role: 'teacher',
-                full_name: name.trim(),
-                grade: '',
-                avatar_url: null,
-                total_points: 0,
-                current_streak: 0,
-                study_hours_this_week: 0,
-                created_at: new Date().toISOString(),
-            };
-            login(teacherUser);
-        }, 1000);
+      const result = await loginUser(name.trim(), password);
+      
+      // Kiểm tra role khớp với tab đang chọn
+      if (result.user.role !== role) {
+        setError(role === 'student'
+          ? 'Tài khoản này là Giáo viên. Vui lòng chuyển sang tab Giáo viên.'
+          : 'Tài khoản này là Học sinh. Vui lòng chuyển sang tab Học sinh.');
         return;
       }
 
-      // Student Login logic
-      const results = await searchStudents(name.trim());
-      if (results.length === 0) {
-        setError('Không tìm thấy tài khoản học sinh này trong hệ thống.');
-      } else if (results.length === 1) {
-        // NOTE: Giả lập đăng nhập thành công bỏ qua check password
-        login(results[0]);
-      } else {
-        setMatchedUsers(results);
-      }
+      login(result.user);
     } catch (err: any) {
       setError(err.message || 'Không thể kết nối đến máy chủ xác thực.');
     } finally {
-      if (role === 'student') setLoading(false);
+      setLoading(false);
     }
   };
 
@@ -160,7 +140,7 @@ export default function LoginScreen() {
                     type="text"
                     placeholder="Nhập tên đăng nhập..."
                     value={name}
-                    onChange={(e) => { setName(e.target.value); setError(null); setMatchedUsers(null); }}
+                    onChange={(e) => { setName(e.target.value); setError(null); }}
                     className="w-full rounded-2xl pl-11 pr-5 py-4 text-sm bg-white border border-slate-200 shadow-[0_2px_10px_rgb(0,0,0,0.02)] outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition font-medium"
                   />
                 </div>
@@ -193,35 +173,10 @@ export default function LoginScreen() {
                 </div>
               )}
 
-              {/* Matched Users List */}
-              {matchedUsers && matchedUsers.length > 1 && (
-                <div className="space-y-2 animate-in slide-in-from-top-2 duration-300 bg-white border border-blue-100 p-4 rounded-2xl shadow-lg shadow-blue-900/5">
-                  <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <Sparkles className="w-4 h-4" /> Phát hiện nhiều tài khoản
-                  </p>
-                  {matchedUsers.map((u) => (
-                    <button
-                      key={u.id}
-                      type="button"
-                      onClick={() => login(u)}
-                      className="w-full flex items-center gap-4 p-3 bg-slate-50 border border-slate-100 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition text-left group"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0 group-hover:bg-blue-600 transition">
-                        <span className="font-bold text-blue-600 text-sm group-hover:text-white">{u.full_name.charAt(0)}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-slate-800 text-sm truncate">{u.full_name}</p>
-                        <p className="text-xs text-slate-500 font-medium">{u.grade} • {u.total_points} pts</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={loading || !name.trim() || !password.trim() || matchedUsers !== null}
+                disabled={loading || !name.trim() || !password.trim()}
                 className={`w-full py-4 mt-4 rounded-2xl font-bold text-base shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:shadow-none ${
                   role === 'student'
                     ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-600/30 hover:shadow-blue-600/40 transform hover:-translate-y-0.5'
@@ -242,7 +197,7 @@ export default function LoginScreen() {
           </form>
 
           <p className="text-center text-xs text-slate-400 font-medium mt-8">
-            Hệ thống đang trong quá trình thử nghiệm. Mật khẩu có thể nhập bất kỳ để vượt qua xác thực mock.
+            AntiRot LMS — Hệ thống học tập thích ứng AI, HCMUT.
           </p>
         </div>
       </div>

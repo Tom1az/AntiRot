@@ -31,6 +31,7 @@ function TeacherAnalytics() {
   const [totalStudents, setTotalStudents] = useState(0);
   const [alerts, setAlerts] = useState<AlertInsight[]>([]);
   const [riskDistribution, setRiskDistribution] = useState<Record<string, number>>({});
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -184,7 +185,7 @@ function TeacherAnalytics() {
                   </thead>
                   <tbody>
                     {students.length > 0 ? students.map(s => (
-                       <tr key={s.id} className="border-b last:border-0 hover:bg-slate-50 transition cursor-pointer">
+                       <tr key={s.id} onClick={() => setSelectedStudentId(s.id)} className="border-b last:border-0 hover:bg-slate-50 transition cursor-pointer">
                           <td className="py-4 pl-2 font-bold text-slate-800 flex items-center gap-2">
                             <div className="w-8 h-8 rounded-full bg-slate-200"></div> {s.full_name}
                           </td>
@@ -241,6 +242,13 @@ function TeacherAnalytics() {
             </button>
          </div>
       </div>
+
+      {selectedStudentId && (
+        <StudentDetailModal 
+          studentId={selectedStudentId} 
+          onClose={() => setSelectedStudentId(null)} 
+        />
+      )}
     </>
   );
 }
@@ -268,9 +276,9 @@ function StatCard({ label, value, subtitle, icon, highlight }: StatCardProps) {
 // ---------------------------------------------------------------------------
 // STUDENT VIEW — kết nối API
 // ---------------------------------------------------------------------------
-function StudentAnalytics() {
+function StudentAnalytics({ overrideStudentId }: { overrideStudentId?: string }) {
   const { user } = useAuth();
-  const studentId = user?.id || '';
+  const studentId = overrideStudentId || user?.id || '';
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<any>(null);
@@ -412,5 +420,26 @@ function StudentAnalytics() {
          </div>
       </div>
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MODAL XEM CHI TIẾT HỌC SINH CHO GIÁO VIÊN
+// ---------------------------------------------------------------------------
+function StudentDetailModal({ studentId, onClose }: { studentId: string, onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 md:p-8" onClick={onClose}>
+      <div className="bg-slate-50 w-full max-w-6xl h-[90vh] rounded-3xl overflow-y-auto relative shadow-2xl" onClick={e => e.stopPropagation()}>
+        <button 
+          onClick={onClose} 
+          className="absolute top-6 right-6 bg-white hover:bg-slate-100 text-slate-500 w-10 h-10 rounded-full flex items-center justify-center font-bold z-50 shadow-sm border"
+        >
+          X
+        </button>
+        <div className="p-8">
+          <StudentAnalytics overrideStudentId={studentId} />
+        </div>
+      </div>
+    </div>
   );
 }

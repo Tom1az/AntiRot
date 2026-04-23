@@ -18,6 +18,7 @@ DROP TABLE IF EXISTS ai_recovery_plans CASCADE;
 DROP TABLE IF EXISTS alert_insights CASCADE;
 DROP TABLE IF EXISTS chat_sessions CASCADE;
 DROP TABLE IF EXISTS quiz_history CASCADE;
+DROP TABLE IF EXISTS teacher_quizzes CASCADE;
 DROP TABLE IF EXISTS learning_progress CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
@@ -76,6 +77,20 @@ CREATE TABLE IF NOT EXISTS quiz_history (
     score INTEGER,
     hints_used INTEGER DEFAULT 0,
     quiz_details JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================================
+-- 4.1. BẢNG TEACHER_QUIZZES (Lưu đề thi do giáo viên tạo)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS teacher_quizzes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    teacher_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    topic_name VARCHAR NOT NULL,
+    difficulty_level VARCHAR NOT NULL,
+    target_grade VARCHAR,
+    expires_at TIMESTAMPTZ,
+    questions JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

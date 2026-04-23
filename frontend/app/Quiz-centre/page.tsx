@@ -1,9 +1,12 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { getTeacherQuestions, getAIQuestions, submitQuiz, getStudentDashboard } from '@/services/apiClient';
+import { 
+  getTeacherQuestions, getAIQuestions, submitQuiz, getStudentDashboard, 
+  generateTeacherQuiz, saveTeacherQuiz, getAssignedQuizzes 
+} from '@/services/apiClient';
 import type { QuizQuestion } from '@/types/api';
-import { Bot, ChevronRight, Flame, Activity, AlertTriangle, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { Bot, ChevronRight, Flame, Activity, AlertTriangle, AlertCircle, CheckCircle, Loader2, Brain, ShieldCheck } from 'lucide-react';
 
 const TOPICS = [
   { key: 'dsa', label: 'DSA' },
@@ -32,8 +35,10 @@ export default function QuizCentrePage() {
   // Data state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [streak, setStreak] = useState(0);
   const [totalPoints, setTotalPoints] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [assignedQuizzes, setAssignedQuizzes] = useState<any[]>([]);
+  const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null);
 
   // Load profile data
   useEffect(() => {
@@ -42,8 +47,13 @@ export default function QuizCentrePage() {
       .then((d) => {
         setStreak(d.profile.current_streak);
         setTotalPoints(d.profile.total_points);
+        // Sau khi có profile, lấy quiz theo lớp của học sinh
+        return getAssignedQuizzes(d.profile.grade);
       })
-      .catch(() => {});
+      .then(setAssignedQuizzes)
+      .catch((err) => {
+        console.error("Lỗi khi tải dữ liệu học sinh:", err);
+      });
   }, [isTeacher, studentId]);
 
   // Fetch questions when topic or type changes
@@ -61,8 +71,20 @@ export default function QuizCentrePage() {
 
     try {
       if (quizType === 'teacher') {
-        const data = await getTeacherQuestions(selectedTopic);
-        setQuestions(data.questions);
+        if (selectedQuizId) {
+          const quiz = assignedQuizzes.find(q => q.id === selectedQuizId);
+          if (quiz) {
+            setQuestions(quiz.questions);
+          } else {
+            // Fallback nếu không thấy ID (có thể do đã reset)
+            const data = await getTeacherQuestions(selectedTopic);
+            setQuestions(data.questions);
+          }
+        } else {
+          // Mặc định load topic đầu nếu chưa chọn quiz cụ thể
+          const data = await getTeacherQuestions(selectedTopic);
+          setQuestions(data.questions);
+        }
       } else {
         const data = await getAIQuestions(selectedTopic, 'medium', 5);
         setQuestions(data.questions);
@@ -79,7 +101,7 @@ export default function QuizCentrePage() {
     if (!isTeacher) {
       fetchQuestions();
     }
-  }, [selectedTopic, quizType, isTeacher]);
+  }, [selectedTopic, quizType, isTeacher, selectedQuizId]);
 
   const currentQ = questions[currentIdx];
 
@@ -125,12 +147,7 @@ export default function QuizCentrePage() {
   };
 
   if (isTeacher) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-slate-500 animate-in fade-in duration-500">
-        <h2 className="text-2xl font-bold text-slate-700 mb-2">Teacher: Manage Quizzes</h2>
-        <p>This view will show quiz generation via AI and class assignment tools.</p>
-      </div>
-    );
+    return <TeacherQuizGenerator />;
   }
 
   return (
@@ -145,16 +162,16 @@ export default function QuizCentrePage() {
              </div>
              <h1 className="text-3xl font-bold text-slate-800">Quiz Centre</h1>
           </div>
-          <p className="text-slate-500 font-semibold ml-12">Your adaptive learning path, curated by AI.</p>
+          <p className="text-slate-500 font-semibold ml-12">Lộ trình học thích ứng, được cá nhân hoá bởi AI.</p>
         </div>
 
         <div className="flex gap-4">
            <div className="bg-white px-5 py-3 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white text-center">
-             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1"><Flame className="w-3 h-3 text-orange-500" /> STREAK</p>
-             <p className="font-bold text-slate-800 text-lg">{streak} Days</p>
+             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1"><Flame className="w-3 h-3 text-orange-500" /> CHUỖI NGÀY</p>
+             <p className="font-bold text-slate-800 text-lg">{streak} Ngày</p>
            </div>
            <div className="bg-white px-5 py-3 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white text-center">
-             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">TOTAL POINTS</p>
+             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">TỔNG ĐIỂM</p>
              <p className="font-bold text-blue-600 text-lg">{totalPoints.toLocaleString()}</p>
            </div>
         </div>
@@ -166,7 +183,7 @@ export default function QuizCentrePage() {
          <div className="w-80 bg-white rounded-4xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white flex flex-col overflow-hidden">
             <div className="p-6 border-b">
                <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                 <Activity className="w-5 h-5 text-blue-600" /> Quiz Topics
+                 <Activity className="w-5 h-5 text-blue-600" /> Chủ đề Quiz
                </h3>
             </div>
             
@@ -177,39 +194,86 @@ export default function QuizCentrePage() {
                    onClick={() => setQuizType('teacher')}
                    className={`flex-1 py-2 rounded-xl text-xs font-bold transition ${quizType === 'teacher' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}
                  >
-                   Teacher Quiz
+                   Quiz Giáo viên
                  </button>
                  <button 
                    onClick={() => setQuizType('ai')}
                    className={`flex-1 py-2 rounded-xl text-xs font-bold transition ${quizType === 'ai' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-500'}`}
                  >
-                   AI Quiz
+                   Quiz AI
                  </button>
                </div>
 
-               {TOPICS.map((t) => (
-                 <div 
-                   key={t.key}
-                   onClick={() => setSelectedTopic(t.key)}
-                   className={`rounded-2xl p-4 cursor-pointer transition ${
-                     selectedTopic === t.key 
-                       ? 'border-2 border-blue-600 bg-blue-50/30' 
-                       : 'border border-slate-200 bg-white hover:border-slate-300'
-                   }`}
-                 >
-                    <h4 className="font-bold text-slate-800 flex items-center gap-2 mb-1">
-                      {t.label}
-                      {selectedTopic === t.key && <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>}
-                    </h4>
-                    <p className="text-xs text-slate-500 font-semibold">
-                      {quizType === 'teacher' ? 'Ngân hàng đề giáo viên' : 'AI tạo câu hỏi thích ứng'}
-                    </p>
-                 </div>
-               ))}
+               {quizType === 'ai' ? (
+                 TOPICS.map((t) => (
+                   <div 
+                     key={t.key}
+                     onClick={() => setSelectedTopic(t.key)}
+                     className={`rounded-2xl p-4 cursor-pointer transition ${
+                       selectedTopic === t.key 
+                         ? 'border-2 border-purple-600 bg-purple-50/30' 
+                         : 'border border-slate-200 bg-white hover:border-slate-300'
+                     }`}
+                   >
+                      <h4 className="font-bold text-slate-800 flex items-center gap-2 mb-1">
+                        {t.label}
+                        {selectedTopic === t.key && <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse"></span>}
+                      </h4>
+                      <p className="text-xs text-slate-500 font-semibold">
+                        AI tạo câu hỏi thích ứng
+                      </p>
+                   </div>
+                 ))
+               ) : (
+                 assignedQuizzes.length > 0 ? (
+                   Object.entries(
+                     assignedQuizzes.reduce((acc, q) => {
+                       const match = q.topic_name.match(/^\[(.*?)\]/);
+                       const subject = match ? match[1] : 'Khác';
+                       if (!acc[subject]) acc[subject] = [];
+                       acc[subject].push(q);
+                       return acc;
+                     }, {} as Record<string, any[]>)
+                   ).map(([subject, quizzes]) => (
+                     <div key={subject} className="mb-6">
+                        <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
+                           <span className="w-1 h-1 rounded-full bg-slate-300"></span> {subject}
+                        </h5>
+                        <div className="space-y-2">
+                          {(quizzes as any[]).map((q) => (
+                            <div 
+                              key={q.id}
+                              onClick={() => setSelectedQuizId(q.id)}
+                              className={`rounded-2xl p-4 cursor-pointer transition ${
+                                selectedQuizId === q.id 
+                                  ? 'border-2 border-blue-600 bg-blue-50/30' 
+                                  : 'border border-slate-200 bg-white hover:border-slate-300 shadow-sm'
+                              }`}
+                            >
+                               <div className="flex justify-between items-start mb-1">
+                                 <h4 className="font-bold text-slate-800 flex-1 pr-2 leading-tight text-xs">
+                                   {q.topic_name.replace(/^\[.*?\]\s*/, '')}
+                                 </h4>
+                                 <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-100 text-blue-600">
+                                   {q.difficulty_level}
+                                 </span>
+                               </div>
+                               <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">
+                                 Hạn: {q.expires_at ? new Date(q.expires_at).toLocaleDateString() : 'Không thời hạn'}
+                               </p>
+                            </div>
+                          ))}
+                        </div>
+                     </div>
+                   ))
+                 ) : (
+                   <p className="text-center text-slate-400 py-10 text-xs font-bold italic">Chưa có quiz nào được giao.</p>
+                 )
+               )}
             </div>
 
             <div className="p-4 border-t bg-slate-50 text-center">
-               <button onClick={fetchQuestions} className="text-sm font-bold text-blue-600 hover:text-blue-700">Reload Questions</button>
+               <button onClick={fetchQuestions} className="text-sm font-bold text-blue-600 hover:text-blue-700">Tải lại câu hỏi</button>
             </div>
          </div>
 
@@ -238,10 +302,10 @@ export default function QuizCentrePage() {
                  <>
                    {/* Header QA */}
                    <div className="flex justify-between items-center mb-12">
-                      <p className="font-bold text-slate-500">Question {currentIdx + 1} of {questions.length}</p>
+                      <p className="font-bold text-slate-500">Câu {currentIdx + 1} / {questions.length}</p>
                       <div className="flex gap-4 text-xs font-bold">
-                         <span className="text-green-600 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-600"></span> {correctCount} Correct</span>
-                         <span className="text-red-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500"></span> {incorrectCount} Incorrect</span>
+                         <span className="text-green-600 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-600"></span> {correctCount} Đúng</span>
+                         <span className="text-red-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500"></span> {incorrectCount} Sai</span>
                       </div>
                    </div>
 
@@ -288,12 +352,12 @@ export default function QuizCentrePage() {
                             </div>
                             <div>
                                <h4 className={`font-bold mb-1 ${isCorrect ? 'text-green-800' : 'text-purple-900'}`}>
-                                 {isCorrect ? 'Excellent! That is correct.' : 'Not quite right.'}
+                                 {isCorrect ? 'Xuất sắc! Câu trả lời chính xác.' : 'Chưa đúng rồi.'}
                                </h4>
                                <p className={`text-sm leading-relaxed ${isCorrect ? 'text-green-700' : 'text-purple-800'}`}>
                                  {isCorrect 
-                                   ? 'Great job! Progress updated. Keep pushing!' 
-                                   : `The correct answer is: "${currentQ.options[0]}". ${currentQ.hint}`}
+                                   ? 'Tuyệt vời! Tiến độ đã được cập nhật. Tiếp tục phát huy!' 
+                                   : `Đáp án đúng là: "${currentQ.options[0]}". ${currentQ.hint}`}
                                </p>
                             </div>
                          </div>
@@ -308,7 +372,7 @@ export default function QuizCentrePage() {
                           disabled={!selectedAnswer}
                           className="bg-blue-600 text-white px-8 py-4 rounded-full font-bold shadow-sm hover:bg-blue-700 disabled:opacity-50 transition flex items-center gap-2"
                         >
-                           Submit Answer <ChevronRight className="w-5 h-5" />
+                           Trả lời <ChevronRight className="w-5 h-5" />
                         </button>
                       )}
                       {isSubmitted && currentIdx < questions.length - 1 && (
@@ -316,7 +380,7 @@ export default function QuizCentrePage() {
                           onClick={handleNextQuestion}
                           className="bg-green-600 text-white px-8 py-4 rounded-full font-bold shadow-sm hover:bg-green-700 transition flex items-center gap-2"
                         >
-                           Next Question <ChevronRight className="w-5 h-5" />
+                           Câu tiếp theo <ChevronRight className="w-5 h-5" />
                         </button>
                       )}
                       {isSubmitted && currentIdx === questions.length - 1 && (
@@ -342,7 +406,7 @@ export default function QuizCentrePage() {
                {!loading && !error && questions.length === 0 && (
                  <div className="flex flex-col items-center justify-center flex-1 gap-3 text-slate-400">
                    <Bot className="w-12 h-12 text-blue-200" />
-                   <p className="font-semibold">Chưa có câu hỏi cho topic này.</p>
+                   <p className="font-semibold">Chưa có câu hỏi cho chủ đề này.</p>
                  </div>
                )}
 
@@ -364,23 +428,34 @@ export default function QuizCentrePage() {
                    </p>
                 </div>
 
-                {/* Knowledge Decay Alert */}
-                <div className="bg-white rounded-3xl border border-red-50 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-                   <div className="flex items-center gap-2 mb-3">
-                       <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center">
-                           <AlertTriangle className="w-4 h-4 text-red-500" />
+                {/* AntiRot Monitor */}
+                 {(() => {
+                   const level = hintsUsed <= 1 ? 'good' : hintsUsed <= 3 ? 'warning' : 'danger';
+                   const cfg = {
+                     good: { label: 'Tốt', msg: 'Bạn đang có chỉ số độc lập tốt. Tiếp tục phát huy!', bg: 'bg-green-50', border: 'border-green-100', iconBg: 'bg-green-100', iconColor: 'text-green-600', barBg: 'bg-green-200', barFill: 'bg-green-500' },
+                     warning: { label: 'Cần chú ý', msg: 'Bạn đang dùng nhiều gợi ý. Hãy thử tự giải!', bg: 'bg-amber-50', border: 'border-amber-100', iconBg: 'bg-amber-100', iconColor: 'text-amber-600', barBg: 'bg-amber-200', barFill: 'bg-amber-500' },
+                     danger: { label: 'Báo động!', msg: 'Cảnh báo: Bạn đang sử dụng quá nhiều Hint!', bg: 'bg-red-50', border: 'border-red-100', iconBg: 'bg-red-100', iconColor: 'text-red-600', barBg: 'bg-red-200', barFill: 'bg-red-500' },
+                   }[level];
+                   const Icon = level === 'good' ? ShieldCheck : level === 'warning' ? AlertTriangle : Brain;
+                   return (
+                     <div className={`${cfg.bg} rounded-3xl border ${cfg.border} p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-colors duration-500`}>
+                       <div className="flex items-center gap-2 mb-3">
+                         <div className={`w-8 h-8 rounded-full ${cfg.iconBg} flex items-center justify-center`}>
+                           <Icon className={`w-4 h-4 ${cfg.iconColor}`} />
+                         </div>
+                         <h4 className={`font-bold ${cfg.iconColor} text-sm`}>AntiRot Monitor</h4>
                        </div>
-                       <h4 className="font-bold text-red-600 text-sm">Anti-Rot Monitor</h4>
-                   </div>
-                   <p className="text-xs text-slate-600 font-medium leading-relaxed mb-4">
-                      {hintsUsed > 2 
-                        ? <><strong className="text-red-600">Cảnh báo:</strong> Bạn đang sử dụng quá nhiều Hint. Hãy thử tự giải!</>
-                        : 'Bạn đang có chỉ số độc lập tốt. Tiếp tục phát huy!'}
-                   </p>
-                   <div className={`w-full h-2 rounded-full ${hintsUsed > 2 ? 'bg-red-200' : 'bg-green-200'}`}>
-                     <div className={`h-full rounded-full transition-all ${hintsUsed > 2 ? 'bg-red-500' : 'bg-green-500'}`} style={{ width: `${Math.min(100, hintsUsed * 20)}%` }}></div>
-                   </div>
-                </div>
+                       <div className={`inline-flex items-center gap-1.5 ${cfg.iconBg} px-3 py-1 rounded-full mb-3`}>
+                         <span className={`text-[10px] font-bold ${cfg.iconColor} uppercase tracking-wider`}>{cfg.label}</span>
+                       </div>
+                       <p className="text-xs text-slate-600 font-medium leading-relaxed mb-4">{cfg.msg}</p>
+                       <div className={`w-full h-2 rounded-full ${cfg.barBg}`}>
+                         <div className={`h-full rounded-full transition-all duration-500 ${cfg.barFill}`} style={{ width: `${Math.min(100, hintsUsed * 20)}%` }}></div>
+                       </div>
+                       <p className="text-[10px] text-slate-400 font-bold mt-2 uppercase tracking-wider">Gợi ý đã dùng: {hintsUsed}</p>
+                     </div>
+                   );
+                 })()}
 
             </div>
 
@@ -396,5 +471,247 @@ function ActivityBg() {
     <svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
     </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TEACHER QUIZ GENERATOR
+// ---------------------------------------------------------------------------
+function TeacherQuizGenerator() {
+  const { user } = useAuth();
+  const [topic, setTopic] = useState('[DSA] Graph Search (BFS/DFS)');
+  const [difficulty, setDifficulty] = useState('medium');
+  const [numQuestions, setNumQuestions] = useState(3);
+  const [targetGrade, setTargetGrade] = useState('');
+  const [expiresAt, setExpiresAt] = useState('');
+  
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [generatedQuiz, setGeneratedQuiz] = useState<any[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleGenerate = async () => {
+    if (!topic) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await generateTeacherQuiz(topic, difficulty, numQuestions);
+      setGeneratedQuiz(res.questions);
+    } catch (err: any) {
+      setError(err.message || 'Lỗi tạo câu hỏi');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleQuestionChange = (index: number, field: string, value: string) => {
+    const newQuiz = [...generatedQuiz];
+    newQuiz[index][field] = value;
+    setGeneratedQuiz(newQuiz);
+  };
+
+  const handleOptionChange = (qIndex: number, optIndex: number, value: string) => {
+    const newQuiz = [...generatedQuiz];
+    const oldOpt = newQuiz[qIndex].options[optIndex];
+    newQuiz[qIndex].options[optIndex] = value;
+    // Cập nhật đáp án đúng nếu sửa text của option hiện đang là đáp án
+    if (newQuiz[qIndex].answer === oldOpt) {
+      newQuiz[qIndex].answer = value;
+    }
+    setGeneratedQuiz(newQuiz);
+  };
+
+  const handleSetCorrectAnswer = (qIndex: number, value: string) => {
+    const newQuiz = [...generatedQuiz];
+    newQuiz[qIndex].answer = value;
+    setGeneratedQuiz(newQuiz);
+  };
+
+  const handleSave = async () => {
+    if (generatedQuiz.length === 0) return;
+    setIsSaving(true);
+    try {
+      await saveTeacherQuiz({
+        teacher_id: user?.id,
+        topic_name: topic,
+        difficulty_level: difficulty,
+        target_grade: targetGrade || undefined,
+        expires_at: expiresAt ? new Date(expiresAt).toISOString() : undefined,
+        questions: generatedQuiz
+      });
+      alert('Đã lưu bộ câu hỏi thành công!');
+      setTopic('');
+      setGeneratedQuiz([]);
+    } catch (err: any) {
+      alert(`Lỗi lưu: ${err.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto h-full flex flex-col gap-6 animate-in fade-in duration-500 w-full pt-10">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white">
+          <Bot className="w-6 h-6" />
+        </div>
+        <div>
+          <h1 className="text-3xl font-bold text-slate-800">AI Quiz Generator</h1>
+          <p className="text-slate-500 font-semibold">Tạo đề thi tự động bằng Socratic AI</p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
+          <div className="flex flex-col gap-2 lg:col-span-2">
+            <label className="text-sm font-bold text-slate-700">Chủ đề (Topic)</label>
+            <select 
+              className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-medium"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+            >
+              <option value="[DSA] Graph Search (BFS/DFS)">[DSA] Graph Search (BFS/DFS)</option>
+              <option value="[DSA] Dynamic Programming">[DSA] Dynamic Programming</option>
+              <option value="[LTNC] Pointers & References">[LTNC] Pointers & References</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-bold text-slate-700">Độ khó</label>
+            <select 
+              className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-medium"
+              value={difficulty}
+              onChange={(e) => setDifficulty(e.target.value)}
+            >
+              <option value="easy">Dễ (Easy)</option>
+              <option value="medium">Trung bình (Medium)</option>
+              <option value="hard">Khó (Hard)</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-bold text-slate-700">Số lượng câu</label>
+            <input 
+              type="number" 
+              min={1} 
+              max={10} 
+              className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-medium"
+              value={numQuestions}
+              onChange={(e) => setNumQuestions(Number(e.target.value))}
+            />
+          </div>
+          <div className="flex flex-col gap-2 lg:col-span-1">
+            <label className="text-sm font-bold text-slate-700">Giao cho Lớp</label>
+            <input 
+              type="text" 
+              placeholder="VD: L01 (Tùy chọn)" 
+              className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-medium"
+              value={targetGrade}
+              onChange={(e) => setTargetGrade(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-2 lg:col-span-1">
+            <label className="text-sm font-bold text-slate-700">Hạn chót</label>
+            <input 
+              type="datetime-local" 
+              className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-medium text-sm"
+              value={expiresAt}
+              onChange={(e) => setExpiresAt(e.target.value)}
+            />
+          </div>
+        </div>
+        
+        <button 
+          onClick={handleGenerate} 
+          disabled={loading || !topic}
+          className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition disabled:opacity-50 flex justify-center items-center gap-2"
+        >
+          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Bot className="w-5 h-5" />}
+          {loading ? 'AI Đang suy nghĩ...' : 'Tạo Bộ Câu Hỏi'}
+        </button>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 flex items-center gap-3 font-medium">
+          <AlertTriangle className="w-5 h-5" />
+          {error}
+        </div>
+      )}
+
+      {generatedQuiz.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 md:p-8" onClick={() => setGeneratedQuiz([])}>
+          <div className="bg-slate-50 w-full max-w-4xl h-[90vh] rounded-3xl overflow-hidden relative shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+            <button 
+              onClick={() => setGeneratedQuiz([])} 
+              className="absolute top-6 right-6 bg-white hover:bg-slate-100 text-slate-500 w-10 h-10 rounded-full flex items-center justify-center font-bold z-50 shadow-sm border"
+            >
+              X
+            </button>
+            <div className="p-8 flex-1 flex flex-col overflow-hidden">
+              <div className="flex justify-between items-center mb-6 pr-12">
+                <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                  <Flame className="w-6 h-6 text-orange-500" /> Kết quả: {generatedQuiz.length} câu hỏi
+                </h2>
+                <button 
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="bg-green-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-green-700 transition flex items-center gap-2 disabled:opacity-50 shadow-lg"
+                >
+                  {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <div className="w-5 h-5 border-2 border-white rounded-sm" />}
+                  {isSaving ? 'Đang lưu...' : 'Lưu Bộ Câu Hỏi'}
+                </button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto space-y-6 pr-4">
+                {generatedQuiz.map((q, i) => (
+                  <div key={q.id || i} className="p-6 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="flex items-start gap-2 mb-4">
+                      <span className="font-bold text-slate-800 text-lg shrink-0 mt-1">Câu {i + 1}:</span>
+                      <textarea 
+                        value={q.q} 
+                        onChange={(e) => handleQuestionChange(i, 'q', e.target.value)}
+                        className="flex-1 font-bold text-slate-800 text-lg border-b border-dashed border-slate-300 hover:border-blue-500 focus:border-blue-500 focus:border-solid outline-none bg-transparent px-2 py-1 resize-none"
+                        rows={2}
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                      {q.options?.map((opt: string, idx: number) => (
+                        <div key={idx} className={`relative p-3 rounded-xl border font-medium flex items-center gap-2 ${opt === q.answer ? 'bg-green-50 border-green-300' : 'bg-slate-50 border-slate-200'}`}>
+                          <input 
+                            type="radio" 
+                            name={`answer-${i}`} 
+                            checked={opt === q.answer} 
+                            onChange={() => handleSetCorrectAnswer(i, opt)}
+                            className="w-4 h-4 cursor-pointer"
+                            title="Chọn làm đáp án đúng"
+                          />
+                          <span className="font-bold text-slate-400 w-5">{String.fromCharCode(65 + idx)}.</span>
+                          <input 
+                            type="text" 
+                            value={opt} 
+                            onChange={(e) => handleOptionChange(i, idx, e.target.value)}
+                            className={`flex-1 outline-none bg-transparent ${opt === q.answer ? 'text-green-800' : 'text-slate-700'}`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 flex gap-3 items-start">
+                      <Brain className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-xs font-bold text-purple-600 uppercase tracking-widest mb-1">Gợi ý Socratic</p>
+                        <textarea 
+                          value={q.hint} 
+                          onChange={(e) => handleQuestionChange(i, 'hint', e.target.value)}
+                          className="w-full text-sm font-medium text-slate-700 bg-transparent outline-none resize-none overflow-hidden"
+                          rows={2}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
