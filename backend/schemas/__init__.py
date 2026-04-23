@@ -5,3 +5,4 @@ from .progress_schema import *
 from .recovery_schema import *
 from .quiz_schema import *
 from .alert_schema import *
+from .skill_schema import *

@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, MessageSquareText, FileQuestion, LineChart, Settings } from 'lucide-react';
+import { LayoutDashboard, MessageSquareText, FileQuestion, LineChart, Settings, Network } from 'lucide-react';
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -10,6 +10,7 @@ export default function Sidebar() {
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Chat Tutor', path: '/chat-tutor', icon: MessageSquareText },
     { name: 'Quiz Centre', path: '/Quiz-centre', icon: FileQuestion },
+    { name: 'Skill Tree', path: '/knowledge-graph', icon: Network },
     { name: 'Analytics', path: '/Analytics', icon: LineChart },
     { name: 'Settings', path: '/Settings', icon: Settings },
   ];

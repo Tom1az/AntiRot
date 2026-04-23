@@ -4,6 +4,8 @@ from core.database import engine, Base
 import models 
 from routers.student_route import student
 from routers.teacher_route import teacher
+from routers.skill_route import skill_tree
+from routers.auth_route import auth
 
 Base.metadata.create_all(bind=engine)
 
@@ -26,6 +28,8 @@ app.add_middleware(
 # 3. Đăng ký các Routers (Phân quyền Student và Teacher)
 app.include_router(student)
 app.include_router(teacher)
+app.include_router(skill_tree)
+app.include_router(auth)
 
 @app.get("/", tags=["Health Check"])
 def health_check():

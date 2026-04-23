@@ -5,3 +5,4 @@ from .chat_model import ChatSession
 from .quiz_model import QuizHistory
 from .alert_model import AlertInsight
 from .recovery_model import AiRecoveryPlan
+from .skill_model import SkillNode, SkillEdge, StudentSkillStatus

@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { postSocraticChat, getChatSessions, getStudentDashboard } from '@/services/apiClient';
 import type { ChatSession } from '@/types/api';
-import { Send, Bot, User, Bookmark, BrainCircuit, Target, Clock, History, Loader2, AlertTriangle } from 'lucide-react';
+import { Send, Bot, User, Bookmark, BrainCircuit, Target, Clock, History, Loader2, AlertTriangle, Network } from 'lucide-react';
 
 interface ChatMessage {
   id: string;
@@ -265,16 +265,16 @@ export default function ChatTutorPage() {
           </div>
         </div>
 
-        {/* AI Learning Tip */}
-        <div className="bg-purple-50 rounded-4xl border-none p-6 relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-10">
-            <Bot className="w-20 h-20 text-purple-600" />
+        {/* Skill Tree Insight */}
+        <div className="bg-gradient-to-r from-cyan-900/10 to-blue-900/10 rounded-4xl border border-cyan-100 p-6 relative overflow-hidden shadow-[0_4px_20px_rgba(34,211,238,0.1)]">
+          <div className="absolute top-[-10px] right-[-10px] p-4 opacity-20">
+            <Network className="w-24 h-24 text-cyan-600" />
           </div>
-          <h3 className="font-bold mb-2 text-purple-900 flex items-center gap-2">
-            <Target className="w-4 h-4" /> AI Learning Tip
+          <h3 className="font-bold mb-2 text-cyan-800 flex items-center gap-2">
+            <Network className="w-4 h-4" /> Skill Tree Insight
           </h3>
-          <p className="text-sm text-purple-800 leading-relaxed font-medium">
-            "When solving for x, think of the equation like a balanced scale. Whatever you do to one side, you must do to the other to keep it level."
+          <p className="text-sm text-cyan-900 leading-relaxed font-medium relative z-10">
+            "💡 Gợi ý: Bạn đã thành thạo phần <strong>Array</strong> và <strong>Hash Tables</strong> trong Skill Tree. Hãy áp dụng kiến thức đó để tối ưu thời gian chạy của bài toán này xuống O(N) nhé!"
           </p>
         </div>
 

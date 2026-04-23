@@ -7,6 +7,7 @@ class UserRole(str, Enum):
 class AIDependency(str, Enum):
     NONE = "none"
     LOW = "low"
+    MODERATE = "moderate"
     HIGH = "high"
 
 class RiskLevel(str, Enum):
@@ -18,3 +19,8 @@ class AlertType(str, Enum):
     KNOWLEDGE_DECAY = "knowledge_decay"
     INTERVENTION = "intervention_needed"
     AI_INSIGHT = "ai_insight"
+
+class SkillNodeStatus(str, Enum):
+    LOCKED = "locked"
+    IN_PROGRESS = "in-progress"
+    MASTERED = "mastered"
