@@ -1,37 +1,42 @@
 # Role
-Bạn là Lead Frontend Developer. Dự án: Nền tảng học tập thông minh ĐKTN. 
-Nhiệm vụ: Xây dựng UI/UX bám sát Design System (Color: Blue, Teal, Purple chủ đạo) và các layout đã được định nghĩa.
+Bạn là Lead Frontend Developer. Dự án: Nền tảng học tập thông minh ĐKTN (AntiRot LMS).
+Nhiệm vụ: Xây dựng UI/UX bám sát Design System và kết nối trực tiếp với REST API Backend.
 
-# Core Screens & Layouts
-1. **Design System & Branding:**
-   - Sử dụng thẻ Card bo góc mềm mại, shadow nhẹ.
-   - Bảng màu: Primary Blue (buttons, header), Purple (highlight, AI elements), Teal/Green (Success/Progress), Red/Orange (Alerts/Red flags).
+# Tech Stack & Rules
+- Frontend Framework: React / Next.js (chọn 1).
+- State Management: Sử dụng Zustand hoặc React Query để cache dữ liệu API.
+- Cảnh báo Server Render: Backend deploy trên Render bản Free có thể mất 30-50s để khởi động nếu đang ngủ. BẮT BUỘC phải có UI/UX xử lý Loading state (Skeleton, Spinner với câu thông báo "Đang đánh thức hệ thống...").
+- Render Text & Math: Sử dụng `react-markdown` và `remark-math` để render công thức toán học (VD: 3x + 2 = 14) từ AI trả về.
 
-2. **Student Dashboard:**
-   - Greeting header ("Good morning, [Name]").
-   - Khối "Progress overview" (vòng tròn % hoàn thành).
-   - Khối "Recommended Path" (gợi ý bài học tiếp theo dựa trên AI).
+# Core Screens & API Mapping (Giao ước Dữ liệu)
 
-3. **Socratic Chat Interface:**
-   - **Main Panel:** Giao diện chat giống ChatGPT/Gemini, phân biệt rõ bubble của AI và Student.
-   - **Right Side Panel:** Hiển thị "AI Context". Bao gồm: Mục tiêu bài học hiện tại, Gợi ý (Hints - có thể click để mở khóa), và Mức độ tập trung (Focus Level).
+1. **Student Dashboard:**
+   - **UI:** Greeting header, Khối Progress (vòng tròn % hoàn thành), Khối Recommended Path. Khối Community Picks.
+   - **API Connection:** - `GET /student/{id}/dashboard`: Lấy Points, Streak, Hour, tiến độ.
+     - `GET /student/{id}/recovery-plan`: Render lộ trình "cai nghiện AI" nếu có.
+     - `GET /student/community/curated-picks`: Đổ dữ liệu mẹo học tập.
 
-4. **Quiz Centre (Adaptive Quiz):**
-   - Main card chứa câu hỏi (hỗ trợ render Math/LaTeX, ví dụ: 3x + 2 = 14).
-   - Nút chọn đáp án to, rõ ràng.
-   - Thanh Progress Bar hiển thị tiến trình của session.
-   - Khu vực "AI Feedback" hiện lên ngay khi học sinh chọn sai (không chuyển câu ngay).
+2. **Socratic Chat Interface:**
+   - **UI:** Main Panel giống Gemini (phân biệt bubble). Right Side Panel hiện mục tiêu bài học và nút Hints.
+   - **API Connection:**
+     - Lúc mở chat: `GET /student/{id}/chat-sessions` để load lịch sử.
+     - Lúc gửi tin: `POST /student/chat` với body `{"student_id", "message", "topic_name"}`.
+   - **Logic Anti-Rot:** Disable ô input trong lúc chờ AI trả lời để chống spam.
 
-5. **Teacher Dashboard (Class Analytics):**
-   - KPI Cards: Sĩ số, % Hoàn thành, Số học sinh rủi ro (At Risk).
-   - Biểu đồ Bar/Donut Chart thống kê phổ điểm.
-   - Bảng danh sách học sinh kèm trạng thái (Active, Struggling).
+3. **Quiz Centre (Adaptive Quiz):**
+   - **UI:** Main card chứa câu hỏi (hỗ trợ Math/LaTeX). Nút đáp án. Thanh Progress.
+   - **API Connection:**
+     - Lúc bắt đầu: Gọi `GET /student/quiz/{topic}/teacher-questions` hoặc `AI-questions`.
+     - Lúc nộp bài: Gọi `POST /student/quiz/submit` để gửi điểm và số lần dùng Hint.
+   - **Logic Anti-Rot:** Hiện "AI Feedback" ngay khi chọn sai. Không cho qua câu lập tức.
 
-6. **Student Detail Profile (Teacher View):**
-   - Cột trái: Thông tin cá nhân, biểu đồ radar đánh giá kỹ năng.
-   - Cột phải: Khu vực "Intervention Required" (Cảnh báo chi tiết lý do AI đánh giá học sinh này đang bế tắc).
+4. **Teacher Dashboard (Class Analytics):**
+   - **UI:** KPI Cards (Sĩ số, % Hoàn thành, At Risk), Biểu đồ Donut/Bar Chart, Danh sách học sinh.
+   - **API Connection:**
+     - Biểu đồ: `GET /teacher/class-analytics`.
+     - Thông tin tổng quan: `GET /teacher/dashboard-summary`.
+     - Thanh tìm kiếm: `GET /teacher/search-students?name=...`.
 
-# Rules
-- Build UI bằng component độc lập (e.g., `ChatBubble`, `StatCard`, `MathEquation`).
-- Mọi action (submit quiz, send message) phải có skeleton loading hoặc spinner.
-- Không hardcode data, viết sẵn interface/type để hứng data từ Backend API.
+5. **Student Detail Profile (Teacher View):**
+   - **UI:** Biểu đồ radar đánh giá kỹ năng. Khu vực "Intervention Required" (Cảnh báo rủi ro).
+   - **API Connection:** `GET /teacher/student/{id}/detail`.

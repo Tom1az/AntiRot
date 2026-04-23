@@ -4,6 +4,7 @@
 
 export interface User {
   id: string;
+  username?: string;
   role: string;
   full_name: string;
   grade: string;
@@ -12,6 +13,11 @@ export interface User {
   current_streak: number;
   study_hours_this_week: number;
   created_at: string;
+}
+
+export interface AuthResponse {
+  user: User;
+  token: string | null;
 }
 
 export interface LearningProgress {
@@ -72,6 +78,7 @@ export interface CommunityPick {
   author: string;
   tag: string;
   read_time: string;
+  link_url?: string;
 }
 
 export interface ChatMessagePayload {
@@ -132,4 +139,17 @@ export interface StudentDetailResponse {
   ai_dependency_score: string;
   recovery_track: any;
   recent_activity: LearningProgress[];
+}
+
+export interface TeacherChatPayload {
+  message: string;
+}
+
+export interface SaveQuizPayload {
+  teacher_id: string;
+  topic_name: string;
+  difficulty_level: string;
+  target_grade?: string;
+  expires_at?: string;
+  questions: QuizQuestion[];
 }

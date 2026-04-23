@@ -19,6 +19,15 @@ async def get_socratic_reply(history: list, user_input: str):
     response = chat.send_message(f"{SOCRATIC_PROMPT}\n\nUser: {user_input}")
     return response.text
 
+PEDAGOGICAL_PROMPT = """Bạn là Trợ lý Sư phạm (Pedagogical Assistant).
+NHIỆM VỤ: Hỗ trợ giáo viên các phương pháp giảng dạy hiệu quả, gợi ý cách xử lý học sinh yếu kém hoặc lạm dụng AI.
+Luôn đưa ra các bước thực hành cụ thể, chuyên nghiệp, đồng cảm. Dùng tiếng Việt."""
+
+async def get_pedagogical_reply(history: list, user_input: str):
+    chat = model.start_chat(history=[]) 
+    response = chat.send_message(f"{PEDAGOGICAL_PROMPT}\n\nTeacher: {user_input}")
+    return response.text
+
 async def generate_adaptive_quiz(topic: str, difficulty: str, num_questions: int = 3):
     prompt = f"""
     Bạn là một chuyên gia giáo dục. Hãy tạo {num_questions} câu hỏi trắc nghiệm về chủ đề '{topic}'.

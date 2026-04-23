@@ -13,6 +13,7 @@ import type {
   TeacherDashboardSummary,
   StudentDetailResponse,
   User,
+  AuthResponse,
 } from '@/types/api';
 
 // =============================================================================
@@ -38,6 +39,14 @@ api.interceptors.response.use(
     return Promise.reject(new Error(message));
   },
 );
+
+// =============================================================================
+// NHÓM API XÁC THỰC (AUTH)
+// =============================================================================
+
+/** Đăng nhập bằng username + password */
+export const loginUser = (username: string, password: string) =>
+  api.post<AuthResponse>('/auth/login', { username, password }).then((r) => r.data);
 
 // =============================================================================
 // NHÓM API CHO HỌC SINH (STUDENT)
@@ -73,6 +82,10 @@ export const getAIQuestions = (topic: string, difficulty = 'medium', num = 3) =>
 export const submitQuiz = (data: QuizSubmitPayload) =>
   api.post(`/student/quiz/submit`, data).then((r) => r.data);
 
+/** Lấy danh sách Quiz do giáo viên giao */
+export const getAssignedQuizzes = (grade?: string) =>
+  api.get<any[]>(`/student/assigned-quizzes`, { params: { grade } }).then((r) => r.data);
+
 // =============================================================================
 // NHÓM API AI SOCRATIC (CHAT)
 // =============================================================================
@@ -104,5 +117,19 @@ export const getTeacherDashboardSummary = () =>
 /** Frame 5: Chi tiết rủi ro một học sinh cụ thể */
 export const getStudentDetailForTeacher = (studentId: string) =>
   api.get<StudentDetailResponse>(`/teacher/student/${studentId}/detail`).then((r) => r.data);
+
+/** Teacher Chat */
+export const postTeacherChat = (message: string) =>
+  api.post<{ reply: string }>(`/teacher/chat`, { message }).then((r) => r.data);
+
+/** Generate Teacher Quiz */
+export const generateTeacherQuiz = (topic: string, difficulty: string, num: number = 3) =>
+  api.get<{ topic: string, difficulty: string, questions: any[] }>(`/teacher/quiz/generate`, {
+    params: { topic, difficulty, num }
+  }).then((r) => r.data);
+
+/** Save Teacher Quiz */
+export const saveTeacherQuiz = (data: any) =>
+  api.post<{ message: string, quiz_id: string }>(`/teacher/quiz/save`, data).then((r) => r.data);
 
 export default api;

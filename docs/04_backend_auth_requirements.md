@@ -92,3 +92,6 @@ Nếu Hackathon yêu cầu cao về bảo mật, Backend nên:
 1. Trả về `access_token` khi gọi `POST /auth/login`.
 2. Yêu cầu truyền token đó vào header `Authorization: Bearer <token>` ở mọi API gọi sau này (Dashboard, Quiz, Chat).
 3. Tại Frontend, lưu token vào `localStorage` cùng với thông tin user.
+
+
+Về Data: Hiện tại database chưa có bảng lưu "Các Node của Skill Tree". Tôi sẽ giả lập (mock) một cây kỹ năng Môn Cấu trúc Dữ liệu & Giải thuật (DSA) ngay trên Frontend để làm demo cho Hackathon. Bao gồm: Array, Linked List, Tree, Graph, Dynamic Programming.

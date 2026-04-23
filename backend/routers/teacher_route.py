@@ -84,3 +84,57 @@ def get_student_detail_analysis(student_id: UUID, db: Session = Depends(get_db))
         "recovery_track": recovery_plan,
         "recent_activity": activities
     }
+
+# --- 5. CHAT TUTOR (PEDAGOGICAL ASSISTANT) ---
+from pydantic import BaseModel
+from services.chat_engine import get_pedagogical_reply, generate_adaptive_quiz
+
+class TeacherChatPayload(BaseModel):
+    message: str
+
+@teacher.post("/chat")
+async def teacher_chat(payload: TeacherChatPayload):
+    # Dùng get_pedagogical_reply để tư vấn sư phạm
+    reply = await get_pedagogical_reply(history=[], user_input=payload.message)
+    return {"reply": reply}
+
+# --- 6. QUIZ GENERATOR ---
+@teacher.get("/quiz/generate")
+async def generate_teacher_quiz(topic: str, difficulty: str = 'medium', num: int = 3):
+    questions = await generate_adaptive_quiz(topic=topic, difficulty=difficulty, num_questions=num)
+    return {
+        "topic": topic,
+        "difficulty": difficulty,
+        "questions": questions
+    }
+
+class SaveQuizPayload(BaseModel):
+    teacher_id: str
+    topic_name: str
+    difficulty_level: str
+    target_grade: Optional[str] = None
+    expires_at: Optional[str] = None
+    questions: list
+
+@teacher.post("/quiz/save")
+def save_teacher_quiz(payload: SaveQuizPayload, db: Session = Depends(get_db)):
+    from datetime import datetime
+    exp_date = None
+    if payload.expires_at:
+        try:
+            exp_date = datetime.fromisoformat(payload.expires_at)
+        except ValueError:
+            pass
+
+    new_quiz = models.TeacherQuiz(
+        teacher_id=payload.teacher_id,
+        topic_name=payload.topic_name,
+        difficulty_level=payload.difficulty_level,
+        target_grade=payload.target_grade,
+        expires_at=exp_date,
+        questions=payload.questions
+    )
+    db.add(new_quiz)
+    db.commit()
+    db.refresh(new_quiz)
+    return {"message": "Đã lưu bộ câu hỏi thành công", "quiz_id": new_quiz.id}

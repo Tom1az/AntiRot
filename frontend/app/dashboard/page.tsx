@@ -1,14 +1,16 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { getStudentDashboard, getCommunityPicks } from '@/services/apiClient';
-import type { DashboardResponse, CommunityPick } from '@/types/api';
-import { BookOpen, CheckCircle, ChevronRight, PlayCircle, Lock, Target, Brain, Award, AlertTriangle, Lightbulb, Link2, Loader2 } from 'lucide-react';
+import { getStudentDashboard, getCommunityPicks, getTeacherDashboardSummary } from '@/services/apiClient';
+import type { DashboardResponse, CommunityPick, TeacherDashboardSummary } from '@/types/api';
+import { BookOpen, CheckCircle, ChevronRight, PlayCircle, Lock, Target, Brain, Award, AlertTriangle, Lightbulb, Link2, Loader2, Users, Bell } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const studentId = user?.id || '';
   const isTeacher = user?.role === 'teacher';
+  const router = useRouter();
 
   // ---------------------------------------------------------------------------
   // STATE: Loading / Error / Data
@@ -45,12 +47,7 @@ export default function DashboardPage() {
   // TEACHER MODE
   // ---------------------------------------------------------------------------
   if (isTeacher) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-slate-500 animate-in fade-in duration-500">
-        <h2 className="text-2xl font-bold text-slate-700 mb-2">Teacher Dashboard</h2>
-        <p>You are viewing the Teacher Dashboard. Please navigate to Analytics for class data.</p>
-      </div>
-    );
+    return <TeacherDashboard router={router} />;
   }
 
   // ---------------------------------------------------------------------------
@@ -104,7 +101,7 @@ export default function DashboardPage() {
 
   // Dùng greeting dựa trên giờ
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const greeting = hour < 12 ? 'Chào buổi sáng' : hour < 18 ? 'Chào buổi chiều' : 'Chào buổi tối';
 
   // strokeDashoffset cho SVG circle (chu vi ~283)
   const strokeOffset = 283 - (283 * avgMastery) / 100;
@@ -123,11 +120,11 @@ export default function DashboardPage() {
         </div>
 
         <div className="relative z-10 max-w-2xl">
-          <h1 className="text-4xl font-bold mb-3">{greeting}, {profile?.full_name || 'Student'}!</h1>
-          <p className="text-blue-100 mb-8 max-w-lg text-lg">Ready to unlock your potential today? Your curriculum is fresh and waiting for your curiosity.</p>
+          <h1 className="text-4xl font-bold mb-3">{greeting}, {profile?.full_name || 'Bạn'}!</h1>
+          <p className="text-blue-100 mb-8 max-w-lg text-lg">Sẵn sàng chinh phục kiến thức hôm nay? Lộ trình học tập đang chờ sự tò mò của bạn.</p>
           <div className="flex gap-4">
-            <button className="bg-white text-blue-600 px-6 py-3 rounded-full font-bold text-sm hover:bg-slate-50 transition shadow-sm">Resume Lesson</button>
-            <button className="border border-white/30 text-white hover:bg-white/10 px-6 py-3 rounded-full font-bold text-sm transition">View Goals</button>
+            <button onClick={() => router.push('/chat-tutor')} className="bg-white text-blue-600 px-6 py-3 rounded-full font-bold text-sm hover:bg-slate-50 transition shadow-sm">Tiếp tục bài học</button>
+            <button onClick={() => router.push('/knowledge-graph')} className="border border-white/30 text-white hover:bg-white/10 px-6 py-3 rounded-full font-bold text-sm transition">Xem mục tiêu</button>
           </div>
         </div>
       </div>
@@ -141,8 +138,8 @@ export default function DashboardPage() {
           {/* My Courses — dynamic from API */}
           <div className="bg-white rounded-4xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white">
             <div className="flex justify-between items-end mb-6">
-              <h2 className="text-xl font-bold text-slate-800">My Courses</h2>
-              <button className="text-blue-600 font-bold text-sm hover:underline">View All</button>
+              <h2 className="text-xl font-bold text-slate-800">Môn học của tôi</h2>
+              <button onClick={() => router.push('/knowledge-graph')} className="text-blue-600 font-bold text-sm hover:underline">Xem tất cả</button>
             </div>
 
             <div className="grid grid-cols-3 gap-4">
@@ -152,14 +149,14 @@ export default function DashboardPage() {
                   const Icon = courseIcons[i % courseIcons.length];
                   return (
                     <div key={p.id} className={`${c.active ? `border ${c.border} ${c.bg}` : `shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-50 bg-white`} rounded-3xl p-5 relative overflow-hidden ${!c.active && i === 2 ? 'opacity-75' : ''}`}>
-                      {c.active && <div className="absolute top-4 right-4 bg-white text-[10px] font-bold text-blue-600 px-2.5 py-1 rounded-full uppercase shadow-sm">Active</div>}
+                      {c.active && <div className="absolute top-4 right-4 bg-white text-[10px] font-bold text-blue-600 px-2.5 py-1 rounded-full uppercase shadow-sm">Đang học</div>}
                       <div className={`w-10 h-10 ${c.icon} rounded-full flex justify-center items-center mb-4`}>
                         <Icon className="w-5 h-5" />
                       </div>
                       <h3 className="font-bold text-slate-800 text-sm mb-4 pr-10">{p.course_module_name}</h3>
                       <div className="mt-auto">
                         <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase mb-2">
-                          <span>Progress</span>
+                          <span>Tiến độ</span>
                           <span>{p.progress_pct}%</span>
                         </div>
                         <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
@@ -182,15 +179,15 @@ export default function DashboardPage() {
             <div className="flex justify-between items-center mb-8">
               <div>
                 <h2 className="text-xl font-bold text-slate-800 flex items-center gap-3">
-                  Personalized Learning Path
-                  <span className="bg-blue-50 text-blue-600 text-xs px-2 py-1 rounded-md font-semibold">Module {Math.min(progress.length, 12)} of 12</span>
+                  Lộ trình học cá nhân
+                  <span className="bg-blue-50 text-blue-600 text-xs px-2 py-1 rounded-md font-semibold">Module {Math.min(progress.length, 12)} / 12</span>
                 </h2>
               </div>
             </div>
 
             <div className="mb-8">
               <div className="flex justify-between text-sm font-bold text-slate-600 mb-2">
-                <span>Mastery Progress</span>
+                <span>Tiến độ thành thạo</span>
                 <span>{avgMastery}%</span>
               </div>
               <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
@@ -206,8 +203,8 @@ export default function DashboardPage() {
                   <CheckCircle className="w-5 h-5 text-green-500" fill="currentColor" stroke="white" />
                 </div>
                 <div className="pt-1">
-                  <h4 className="font-bold text-slate-800">Fundamentals of Cognitive Bias</h4>
-                  <p className="text-xs font-semibold text-slate-500 mt-1">Mastered on Oct 12 • 4 Lessons</p>
+                  <h4 className="font-bold text-slate-800">Nền tảng Tư duy Phản biện</h4>
+                  <p className="text-xs font-semibold text-slate-500 mt-1">Thành thạo ngày 12/10 • 4 bài học</p>
                 </div>
               </div>
               {/* Step 2 */}
@@ -216,8 +213,8 @@ export default function DashboardPage() {
                   <PlayCircle className="w-5 h-5 text-blue-600" />
                 </div>
                 <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex-1">
-                  <h4 className="font-bold text-blue-900">Advanced Logic & Reasoning</h4>
-                  <p className="text-xs font-semibold text-blue-700 mt-1 mb-3">In Progress • Lesson 5: Syllogisms</p>
+                  <h4 className="font-bold text-blue-900">Logic & Suy luận Nâng cao</h4>
+                  <p className="text-xs font-semibold text-blue-700 mt-1 mb-3">Đang học • Bài 5: Tam đoạn luận</p>
                   <div className="flex gap-2">
                     <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
                       <BookOpen className="w-4 h-4 text-blue-600" />
@@ -234,8 +231,8 @@ export default function DashboardPage() {
                   <Lock className="w-4 h-4 text-slate-400" />
                 </div>
                 <div className="pt-1">
-                  <h4 className="font-bold text-slate-600">Heuristics in Decision Making</h4>
-                  <p className="text-xs font-semibold text-slate-400 mt-1">Locked • Complete Logic first</p>
+                  <h4 className="font-bold text-slate-600">Phương pháp Ra quyết định</h4>
+                  <p className="text-xs font-semibold text-slate-400 mt-1">Đã khoá • Hoàn thành Logic trước</p>
                 </div>
               </div>
             </div>
@@ -246,26 +243,74 @@ export default function DashboardPage() {
         {/* Right Sidebar Area: Scores & Curators */}
         <div className="col-span-12 lg:col-span-4 flex flex-col gap-8">
 
-          {/* Independence Score — dynamic */}
-          <div className="bg-white rounded-4xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white p-8 text-center flex flex-col items-center">
-            <h3 className="font-bold text-slate-800 text-lg mb-6">Independence Score</h3>
+          {/* AntiRot Monitor — dynamic color by mastery level */}
+          {(() => {
+            // Xác định mức độ
+            const level = avgMastery >= 70 ? 'good' : avgMastery >= 40 ? 'warning' : 'danger';
+            const config = {
+              good: {
+                label: 'Tuyệt vời!',
+                sublabel: 'Tư duy độc lập cao',
+                stroke: '#16A34A',   // green-600
+                text: 'text-green-600',
+                bg: 'bg-green-50',
+                border: 'border-green-100',
+                iconBg: 'bg-green-100',
+                iconColor: 'text-green-600',
+              },
+              warning: {
+                label: 'Cần chú ý',
+                sublabel: 'Có dấu hiệu phụ thuộc AI',
+                stroke: '#F59E0B',   // amber-500
+                text: 'text-amber-600',
+                bg: 'bg-amber-50',
+                border: 'border-amber-100',
+                iconBg: 'bg-amber-100',
+                iconColor: 'text-amber-600',
+              },
+              danger: {
+                label: 'Báo động!',
+                sublabel: 'Phụ thuộc AI nghiêm trọng',
+                stroke: '#DC2626',   // red-600
+                text: 'text-red-600',
+                bg: 'bg-red-50',
+                border: 'border-red-100',
+                iconBg: 'bg-red-100',
+                iconColor: 'text-red-600',
+              },
+            }[level];
 
-            {/* Circular Progress */}
-            <div className="relative w-40 h-40 flex items-center justify-center mb-6">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="45" fill="none" stroke="#F1F5F9" strokeWidth="8" />
-                <circle cx="50" cy="50" r="45" fill="none" stroke="#2563EB" strokeWidth="8" strokeDasharray="283" strokeDashoffset={strokeOffset} className="drop-shadow-md" strokeLinecap="round" />
-              </svg>
-              <div className="absolute flex flex-col items-center">
-                <span className="text-4xl font-extrabold text-blue-600 tracking-tighter">{avgMastery}%</span>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Mastery</span>
+            const StatusIcon = level === 'good' ? CheckCircle : level === 'warning' ? AlertTriangle : Brain;
+
+            return (
+              <div className={`${config.bg} rounded-4xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border ${config.border} p-8 text-center flex flex-col items-center transition-colors duration-500`}>
+                {/* Status Badge */}
+                <div className={`inline-flex items-center gap-2 ${config.iconBg} px-4 py-2 rounded-full mb-4`}>
+                  <StatusIcon className={`w-4 h-4 ${config.iconColor}`} />
+                  <span className={`text-xs font-bold ${config.iconColor} uppercase tracking-wider`}>{config.label}</span>
+                </div>
+
+                <h3 className="font-bold text-slate-800 text-lg mb-1">AntiRot Monitor</h3>
+                <p className="text-xs text-slate-500 font-medium mb-6">{config.sublabel}</p>
+
+                {/* Circular Progress */}
+                <div className="relative w-40 h-40 flex items-center justify-center mb-6">
+                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="#F1F5F9" strokeWidth="8" />
+                    <circle cx="50" cy="50" r="45" fill="none" stroke={config.stroke} strokeWidth="8" strokeDasharray="283" strokeDashoffset={strokeOffset} className="drop-shadow-md transition-all duration-700" strokeLinecap="round" />
+                  </svg>
+                  <div className="absolute flex flex-col items-center">
+                    <span className={`text-4xl font-extrabold ${config.text} tracking-tighter`}>{avgMastery}%</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Mastery</span>
+                  </div>
+                </div>
+
+                <p className="text-sm text-slate-600 font-medium leading-relaxed">
+                  Bạn có <span className={`font-bold ${config.text}`}>{profile?.total_points ?? 0} điểm</span> và chuỗi <span className={`font-bold ${config.text}`}>{profile?.current_streak ?? 0} ngày</span> liên tục. {level === 'good' ? 'Tiếp tục phát huy!' : level === 'warning' ? 'Hãy thử tự giải không dùng gợi ý!' : 'Cần giảm phụ thuộc AI ngay!'}
+                </p>
               </div>
-            </div>
-
-            <p className="text-sm text-slate-600 font-medium leading-relaxed">
-              You have <span className="font-bold text-blue-600">{profile?.total_points ?? 0} points</span> and a <span className="font-bold text-blue-600">{profile?.current_streak ?? 0}-day streak</span>. Keep up the focus!
-            </p>
-          </div>
+            );
+          })()}
 
           {/* AI Tutor Curator Message */}
           <div className="bg-purple-600 text-white rounded-4xl p-8 relative overflow-hidden shadow-md">
@@ -274,13 +319,13 @@ export default function DashboardPage() {
             </div>
             <div className="flex items-center gap-2 mb-4 relative z-10">
               <Brain className="w-5 h-5 text-purple-200" />
-              <h3 className="font-bold text-purple-100 text-sm">AI Tutor Curator</h3>
+              <h3 className="font-bold text-purple-100 text-sm">AI Tutor</h3>
             </div>
             <p className="text-lg font-medium leading-snug relative z-10">
-              "I've noticed you're doing great with syllogisms. Ready to try a real-world application challenge?"
+              "Tôi nhận thấy bạn đang làm tốt phần tam đoạn luận. Sẵn sàng thử thách ứng dụng thực tế chưa?"
             </p>
-            <button className="mt-6 bg-white text-purple-700 px-5 py-2 rounded-full text-sm font-bold shadow-sm hover:bg-slate-50 transition relative z-10">
-              Start Challenge
+            <button onClick={() => router.push('/Quiz-centre')} className="mt-6 bg-white text-purple-700 px-5 py-2 rounded-full text-sm font-bold shadow-sm hover:bg-slate-50 transition relative z-10">
+              Bắt đầu thử thách
             </button>
           </div>
 
@@ -292,41 +337,152 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pb-10">
 
         {/* Alerts */}
-        <div className="bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white rounded-3xl p-5 flex items-center gap-4 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition cursor-pointer">
+        <div onClick={() => router.push('/Quiz-centre')} className="bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white rounded-3xl p-5 flex items-center gap-4 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition cursor-pointer">
           <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center shrink-0">
             <AlertTriangle className="w-6 h-6 text-red-500" />
           </div>
           <div>
-            <h4 className="font-bold text-slate-800">Knowledge Decay</h4>
-            <p className="text-sm text-slate-500 font-medium mt-0.5">{alerts.length} topics need review</p>
+            <h4 className="font-bold text-slate-800">Thui chột Kiến thức</h4>
+            <p className="text-sm text-slate-500 font-medium mt-0.5">{alerts.length} chủ đề cần ôn lại</p>
           </div>
         </div>
 
-        <div className="bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white rounded-3xl p-5 flex items-center gap-4 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition cursor-pointer">
+        <div onClick={() => router.push('/chat-tutor')} className="bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white rounded-3xl p-5 flex items-center gap-4 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition cursor-pointer">
           <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center shrink-0">
             <Lightbulb className="w-6 h-6 text-purple-600" />
           </div>
           <div>
             <h4 className="font-bold text-slate-800">AI Insights</h4>
-            <p className="text-sm text-slate-500 font-medium mt-0.5">{alerts.length > 0 ? alerts[0].title : 'No new insights'}</p>
+            <p className="text-sm text-slate-500 font-medium mt-0.5">{alerts.length > 0 ? alerts[0].title : 'Không có gợi ý mới'}</p>
           </div>
         </div>
 
         {/* Community Pick — dynamic */}
-        <div className="bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white rounded-3xl p-5 flex items-center gap-4 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition cursor-pointer bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-blue-600 text-white">
+        <div onClick={() => window.open(communityPicks.length > 0 ? communityPicks[0].link_url : '#', '_blank')} className="bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white rounded-3xl p-5 flex items-center gap-4 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition cursor-pointer bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-blue-600 text-white">
           <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
             <Link2 className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h4 className="font-bold text-white">Curated Pick</h4>
+            <h4 className="font-bold text-white">Bài viết Nổi bật</h4>
             <p className="text-sm text-blue-100 font-medium mt-0.5">
-              {communityPicks.length > 0 ? communityPicks[0].title : 'No articles available'}
+              {communityPicks.length > 0 ? communityPicks[0].title : 'Chưa có bài viết nào'}
             </p>
           </div>
         </div>
 
       </div>
 
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TEACHER DASHBOARD COMPONENT
+// ---------------------------------------------------------------------------
+function TeacherDashboard({ router }: { router: any }) {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<TeacherDashboardSummary | null>(null);
+
+  useEffect(() => {
+    const fetchTeacherData = async () => {
+      try {
+        const data = await getTeacherDashboardSummary();
+        setSummary(data);
+      } catch (err: any) {
+        setError(err.message || 'Lỗi khi tải dữ liệu giáo viên.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTeacherData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 animate-in fade-in duration-500">
+        <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
+        <p className="text-slate-500 font-semibold text-lg">Đang tải dữ liệu tổng quan...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 animate-in fade-in duration-500">
+        <AlertTriangle className="w-12 h-12 text-red-400" />
+        <p className="text-red-600 font-bold text-lg">Lỗi kết nối</p>
+        <p className="text-slate-500 text-sm">{error}</p>
+      </div>
+    );
+  }
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Chào buổi sáng' : hour < 18 ? 'Chào buổi chiều' : 'Chào buổi tối';
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500 max-w-6xl mx-auto">
+      {/* Hero Section */}
+      <div className="bg-blue-800 rounded-4xl p-10 text-white relative overflow-hidden shadow-md">
+        <div className="relative z-10 max-w-2xl">
+          <h1 className="text-4xl font-bold mb-3">{greeting}, Thầy/Cô {user?.full_name || ''}!</h1>
+          <p className="text-blue-200 mb-8 max-w-lg text-lg">Hôm nay lớp học của chúng ta có gì mới? Hãy xem các thông báo và cảnh báo từ hệ thống Socratic.</p>
+          <div className="flex gap-4">
+            <button onClick={() => router.push('/Analytics')} className="bg-white text-blue-800 px-6 py-3 rounded-full font-bold text-sm hover:bg-slate-50 transition shadow-sm">Xem Phân tích Lớp học</button>
+            <button onClick={() => router.push('/Quiz-centre')} className="border border-white/30 text-white hover:bg-white/10 px-6 py-3 rounded-full font-bold text-sm transition">Tạo Bộ câu hỏi mới</button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Total Students Card */}
+        <div className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Tổng số học sinh</p>
+            <h2 className="text-5xl font-black text-slate-800">{summary?.total_students || 0}</h2>
+          </div>
+          <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center">
+            <Users className="w-8 h-8 text-blue-600" />
+          </div>
+        </div>
+
+        {/* Action Required Card */}
+        <div className="bg-red-50 rounded-3xl p-8 shadow-sm border border-red-100 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-red-400 uppercase tracking-widest mb-2">Cần can thiệp</p>
+            <h2 className="text-5xl font-black text-red-600">{summary?.recent_alerts?.length || 0}</h2>
+          </div>
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+            <Bell className="w-8 h-8 text-red-600" />
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Alerts List */}
+      <div className="bg-white rounded-4xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white">
+        <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-3">
+          Cảnh báo gần đây
+          <span className="bg-red-100 text-red-600 text-xs px-2.5 py-1 rounded-md font-semibold">Mới nhất</span>
+        </h2>
+        {summary?.recent_alerts && summary.recent_alerts.length > 0 ? (
+          <div className="space-y-4">
+            {summary.recent_alerts.map((alert) => (
+              <div key={alert.id} className="p-4 border border-slate-100 rounded-2xl flex gap-4 hover:bg-slate-50 transition cursor-pointer">
+                <div className="w-10 h-10 bg-orange-50 rounded-full flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-orange-500" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-slate-800 text-sm mb-1">{alert.title}</h4>
+                  <p className="text-sm text-slate-600 font-medium">{alert.content}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-slate-500 font-medium py-8 text-center bg-slate-50 rounded-2xl">Không có cảnh báo nào mới từ học sinh.</p>
+        )}
+      </div>
     </div>
   );
 }

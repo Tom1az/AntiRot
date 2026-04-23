@@ -2,9 +2,12 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, MessageSquareText, FileQuestion, LineChart, Settings, Network } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { user } = useAuth();
+  const isTeacher = user?.role === 'teacher';
 
   const menu = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
@@ -13,7 +16,7 @@ export default function Sidebar() {
     { name: 'Skill Tree', path: '/knowledge-graph', icon: Network },
     { name: 'Analytics', path: '/Analytics', icon: LineChart },
     { name: 'Settings', path: '/Settings', icon: Settings },
-  ];
+  ].filter(item => !(isTeacher && item.name === 'Skill Tree'));
 
   return (
     <aside className="w-64 bg-slate-50 flex flex-col h-full sticky top-0 z-10 shadow-[4px_0_24px_rgba(0,0,0,0.04)]">
