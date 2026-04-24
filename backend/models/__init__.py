@@ -6,3 +6,4 @@ from .quiz_model import QuizHistory, TeacherQuiz
 from .alert_model import AlertInsight
 from .recovery_model import AiRecoveryPlan
 from .skill_model import SkillNode, SkillEdge, StudentSkillStatus
+from .course_model import Course, CourseEnrollment

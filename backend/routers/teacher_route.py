@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from core.database import get_db
 import models
@@ -138,3 +138,128 @@ def save_teacher_quiz(payload: SaveQuizPayload, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_quiz)
     return {"message": "Đã lưu bộ câu hỏi thành công", "quiz_id": new_quiz.id}
+
+
+# =============================================================================
+# 7. QUẢN LÝ KHÓA HỌC (COURSES)
+# =============================================================================
+
+class CreateCoursePayload(BaseModel):
+    teacher_id: str
+    name: str               # VD: "[DSA] Graph Search (BFS/DFS)"
+    subject: str             # VD: "dsa"
+    description: Optional[str] = None
+    target_grade: Optional[str] = None
+
+@teacher.post("/courses")
+def create_course(payload: CreateCoursePayload, db: Session = Depends(get_db)):
+    """Giáo viên tạo một khóa học mới (module)."""
+    new_course = models.Course(
+        teacher_id=payload.teacher_id,
+        name=payload.name,
+        subject=payload.subject,
+        description=payload.description,
+        target_grade=payload.target_grade,
+    )
+    db.add(new_course)
+    db.commit()
+    db.refresh(new_course)
+    return {"message": "Đã tạo khóa học thành công", "course": new_course}
+
+
+@teacher.get("/courses")
+def get_teacher_courses(teacher_id: Optional[str] = None, db: Session = Depends(get_db)):
+    """Lấy danh sách khóa học. Nếu có teacher_id thì lọc theo giáo viên."""
+    query = db.query(models.Course)
+    if teacher_id:
+        query = query.filter(models.Course.teacher_id == teacher_id)
+    return query.order_by(models.Course.created_at.desc()).all()
+
+
+@teacher.delete("/courses/{course_id}")
+def delete_course(course_id: UUID, db: Session = Depends(get_db)):
+    """Xóa khóa học."""
+    course = db.query(models.Course).filter(models.Course.id == course_id).first()
+    if not course:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Khóa học không tồn tại.")
+    db.delete(course)
+    db.commit()
+    return {"message": "Đã xóa khóa học."}
+
+
+# =============================================================================
+# 8. ĐĂNG KÝ HỌC SINH VÀO KHÓA HỌC (ENROLLMENT)
+# =============================================================================
+
+class EnrollStudentsPayload(BaseModel):
+    course_id: str
+    student_ids: list[str]   # Danh sách UUID học sinh
+
+@teacher.post("/courses/enroll")
+def enroll_students(payload: EnrollStudentsPayload, db: Session = Depends(get_db)):
+    """Giáo viên thêm học sinh vào khóa học + tự động tạo LearningProgress."""
+    course = db.query(models.Course).filter(models.Course.id == payload.course_id).first()
+    if not course:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Khóa học không tồn tại.")
+
+    enrolled = 0
+    for sid in payload.student_ids:
+        # Kiểm tra đã enroll chưa
+        existing = db.query(models.CourseEnrollment).filter(
+            models.CourseEnrollment.course_id == payload.course_id,
+            models.CourseEnrollment.student_id == sid,
+        ).first()
+        if existing:
+            continue
+
+        # Tạo enrollment
+        db.add(models.CourseEnrollment(
+            course_id=payload.course_id,
+            student_id=sid,
+        ))
+
+        # Tự động tạo LearningProgress nếu chưa có
+        existing_progress = db.query(models.LearningProgress).filter(
+            models.LearningProgress.student_id == sid,
+            models.LearningProgress.course_module_name == course.name,
+        ).first()
+        if not existing_progress:
+            db.add(models.LearningProgress(
+                student_id=sid,
+                course_module_name=course.name,
+                progress_pct=0,
+                mastery_score=0,
+                ai_dependency="none",
+                risk_level="optimal",
+                time_spent_mins=0,
+            ))
+        enrolled += 1
+
+    db.commit()
+    return {"message": f"Đã thêm {enrolled} học sinh vào khóa '{course.name}'."}
+
+
+@teacher.get("/courses/{course_id}/students")
+def get_course_students(course_id: UUID, db: Session = Depends(get_db)):
+    """Lấy danh sách học sinh đã đăng ký vào khóa học."""
+    enrollments = db.query(models.CourseEnrollment).filter(
+        models.CourseEnrollment.course_id == course_id
+    ).all()
+    student_ids = [e.student_id for e in enrollments]
+    students = db.query(models.User).filter(models.User.id.in_(student_ids)).all()
+    return students
+
+
+@teacher.delete("/courses/{course_id}/students/{student_id}")
+def unenroll_student(course_id: UUID, student_id: UUID, db: Session = Depends(get_db)):
+    """Xóa học sinh khỏi khóa học."""
+    enrollment = db.query(models.CourseEnrollment).filter(
+        models.CourseEnrollment.course_id == course_id,
+        models.CourseEnrollment.student_id == student_id,
+    ).first()
+    if enrollment:
+        db.delete(enrollment)
+        db.commit()
+    return {"message": "Đã xóa học sinh khỏi khóa học."}

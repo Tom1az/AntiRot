@@ -31,6 +31,8 @@ export default function QuizCentrePage() {
   const [hintsUsed, setHintsUsed] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [incorrectCount, setIncorrectCount] = useState(0);
+  const [weaknessSummary, setWeaknessSummary] = useState<string | null>(null);
+  const [studyMaterials, setStudyMaterials] = useState<string[]>([]);
 
   // Data state
   const [loading, setLoading] = useState(false);
@@ -39,6 +41,7 @@ export default function QuizCentrePage() {
   const [streak, setStreak] = useState(0);
   const [assignedQuizzes, setAssignedQuizzes] = useState<any[]>([]);
   const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null);
+  const [learningTopics, setLearningTopics] = useState<string[]>([]);
 
   // Load profile data
   useEffect(() => {
@@ -47,6 +50,11 @@ export default function QuizCentrePage() {
       .then((d) => {
         setStreak(d.profile.current_streak);
         setTotalPoints(d.profile.total_points);
+        const topics = d.learning_progress.map(p => p.course_module_name);
+        setLearningTopics(topics);
+        if (topics.length > 0 && selectedTopic === 'dsa') {
+          setSelectedTopic(topics[0]);
+        }
         // Sau khi có profile, lấy quiz theo lớp của học sinh
         return getAssignedQuizzes(d.profile.grade);
       })
@@ -68,6 +76,8 @@ export default function QuizCentrePage() {
     setHintsUsed(0);
     setCorrectCount(0);
     setIncorrectCount(0);
+    setWeaknessSummary(null);
+    setStudyMaterials([]);
 
     try {
       if (quizType === 'teacher') {
@@ -76,18 +86,16 @@ export default function QuizCentrePage() {
           if (quiz) {
             setQuestions(quiz.questions);
           } else {
-            // Fallback nếu không thấy ID (có thể do đã reset)
-            const data = await getTeacherQuestions(selectedTopic);
-            setQuestions(data.questions);
+            setQuestions([]);
           }
         } else {
-          // Mặc định load topic đầu nếu chưa chọn quiz cụ thể
-          const data = await getTeacherQuestions(selectedTopic);
-          setQuestions(data.questions);
+          setQuestions([]);
         }
       } else {
-        const data = await getAIQuestions(selectedTopic, 'medium', 5);
+        const data = await getAIQuestions(studentId, selectedTopic, 5);
         setQuestions(data.questions);
+        setWeaknessSummary(data.weakness_summary || null);
+        setStudyMaterials(data.study_materials || []);
       }
     } catch (err: any) {
       setError(err.message);
@@ -205,25 +213,29 @@ export default function QuizCentrePage() {
                </div>
 
                {quizType === 'ai' ? (
-                 TOPICS.map((t) => (
-                   <div 
-                     key={t.key}
-                     onClick={() => setSelectedTopic(t.key)}
-                     className={`rounded-2xl p-4 cursor-pointer transition ${
-                       selectedTopic === t.key 
-                         ? 'border-2 border-purple-600 bg-purple-50/30' 
-                         : 'border border-slate-200 bg-white hover:border-slate-300'
-                     }`}
-                   >
-                      <h4 className="font-bold text-slate-800 flex items-center gap-2 mb-1">
-                        {t.label}
-                        {selectedTopic === t.key && <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse"></span>}
-                      </h4>
-                      <p className="text-xs text-slate-500 font-semibold">
-                        AI tạo câu hỏi thích ứng
-                      </p>
-                   </div>
-                 ))
+                 learningTopics.length > 0 ? (
+                   learningTopics.map((t) => (
+                     <div 
+                       key={t}
+                       onClick={() => setSelectedTopic(t)}
+                       className={`rounded-2xl p-4 cursor-pointer transition ${
+                         selectedTopic === t 
+                           ? 'border-2 border-purple-600 bg-purple-50/30' 
+                           : 'border border-slate-200 bg-white hover:border-slate-300'
+                       }`}
+                     >
+                        <h4 className="font-bold text-slate-800 flex items-center gap-2 mb-1">
+                          {t}
+                          {selectedTopic === t && <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse"></span>}
+                        </h4>
+                        <p className="text-xs text-slate-500 font-semibold">
+                          AI tạo câu hỏi thích ứng
+                        </p>
+                     </div>
+                   ))
+                 ) : (
+                   <p className="text-center text-slate-400 py-10 text-xs font-bold italic">Bạn chưa tham gia môn học nào.</p>
+                 )
                ) : (
                  assignedQuizzes.length > 0 ? (
                    Object.entries(
@@ -301,13 +313,40 @@ export default function QuizCentrePage() {
                {!loading && !error && currentQ && (
                  <>
                    {/* Header QA */}
-                   <div className="flex justify-between items-center mb-12">
+                   <div className="flex justify-between items-center mb-6">
                       <p className="font-bold text-slate-500">Câu {currentIdx + 1} / {questions.length}</p>
                       <div className="flex gap-4 text-xs font-bold">
                          <span className="text-green-600 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-600"></span> {correctCount} Đúng</span>
                          <span className="text-red-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500"></span> {incorrectCount} Sai</span>
                       </div>
                    </div>
+
+                   {/* AI Weakness Analysis */}
+                   {quizType === 'ai' && weaknessSummary && currentIdx === 0 && (
+                      <div className="mb-8 p-6 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-3xl border border-purple-100 shadow-sm animate-in slide-in-from-top-4 duration-500">
+                         <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm shrink-0">
+                               <Brain className="w-6 h-6 text-purple-600" />
+                            </div>
+                            <div>
+                               <h4 className="font-black text-slate-800 mb-1 text-lg">Phân Tích & Đề Xuất Học Tập</h4>
+                               <p className="text-slate-600 text-sm font-medium leading-relaxed mb-4">{weaknessSummary}</p>
+                               {studyMaterials.length > 0 && (
+                                 <div>
+                                   <p className="text-xs font-black text-purple-600 uppercase tracking-widest mb-2">Tài liệu tham khảo</p>
+                                   <ul className="space-y-1.5">
+                                      {studyMaterials.map((mat, idx) => (
+                                         <li key={idx} className="text-sm text-slate-700 font-semibold flex items-center gap-2">
+                                           <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span> {mat}
+                                         </li>
+                                      ))}
+                                   </ul>
+                                 </div>
+                               )}
+                            </div>
+                         </div>
+                      </div>
+                   )}
 
                    {/* Question */}
                    <div className="text-center mb-12">

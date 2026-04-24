@@ -31,6 +31,34 @@ def get_student_dashboard(student_id: uuid.UUID, db: Session = Depends(get_db)):
     
     progress = db.query(models.LearningProgress).filter(models.LearningProgress.student_id == student_id).all()
     
+    # Lấy các khóa học sinh viên đã đăng ký
+    enrollments = db.query(models.CourseEnrollment).filter(models.CourseEnrollment.student_id == student_id).all()
+    if enrollments:
+        enrolled_course_ids = [e.course_id for e in enrollments]
+        courses = db.query(models.Course).filter(models.Course.id.in_(enrolled_course_ids)).all()
+        
+        progress_course_names = {p.course_module_name for p in progress}
+        
+        for c in courses:
+            if c.name not in progress_course_names:
+                new_prog = models.LearningProgress(
+                    id=uuid.uuid4(),
+                    student_id=student_id,
+                    course_module_name=c.name,
+                    progress_pct=0,
+                    mastery_score=0,
+                    ai_dependency="none",
+                    risk_level="optimal",
+                    time_spent_mins=0,
+                    last_active=datetime.now()
+                )
+                db.add(new_prog)
+                progress.append(new_prog)
+                
+        # Commit changes if we added new progress
+        if len(progress) > len(progress_course_names):
+            db.commit()
+    
     # Lấy thông báo/cảnh báo cho học sinh (Frame 1)
     alerts = db.query(models.AlertInsight).filter(
         models.AlertInsight.student_id == student_id,
@@ -122,28 +150,57 @@ def get_quiz_questions(topic: str):
         raise HTTPException(status_code=404, detail="Topic chưa có câu hỏi mẫu")
     return {"topic": topic, "type": "teacher_assigned", "questions": quiz_db[topic_key]}
 
-@student.get("/quiz/{topic}/ai-questions")
+@student.get("/{student_id}/quiz/{topic}/ai-questions")
 async def get_ai_adaptive_quiz(
+    student_id: uuid.UUID,
     topic: str, 
-    difficulty: str = "medium", # Nhận 'easy', 'medium', 'hard'
-    num: int = 3 # Cho phép Frontend tự định nghĩa số lượng câu hỏi
+    num: int = 3, # Cho phép Frontend tự định nghĩa số lượng câu hỏi
+    db: Session = Depends(get_db)
 ):
-    
-    # Validate độ khó
-    valid_difficulties = ["easy", "medium", "hard"]
-    if difficulty not in valid_difficulties:
-        difficulty = "medium"
-        
     try:
-        # Gọi sang services lấy mảng câu hỏi
-        ai_questions_array = await generate_adaptive_quiz(topic, difficulty, num)
+        # Thu thập ngữ cảnh học sinh
+        user = db.query(models.User).filter(models.User.id == student_id).first()
+        # Lấy progress CỤ THỂ của topic đó
+        progress = db.query(models.LearningProgress).filter(
+            models.LearningProgress.student_id == student_id,
+            models.LearningProgress.course_module_name == topic
+        ).first()
+
+        if not progress:
+            raise HTTPException(status_code=403, detail="Học sinh chưa học hoặc không được cấp quyền truy cập topic này.")
+        
+        # Lấy 3 bài quiz gần nhất của topic này
+        recent_quizzes = db.query(models.QuizHistory).filter(
+            models.QuizHistory.student_id == student_id,
+            models.QuizHistory.topic_name == topic
+        ).order_by(models.QuizHistory.created_at.desc()).limit(3).all()
+        
+        total_hints_used = sum([q.hints_used for q in recent_quizzes])
+        recent_scores = [f"{q.score}/{q.quiz_details.get('total', 0)}" for q in recent_quizzes] if recent_quizzes else []
+        
+        study_hours = user.study_hours_this_week if user else 0
+        ai_dependency = progress.ai_dependency
+        risk_level = progress.risk_level
+
+        student_context = f"""
+        - Chủ đề bài thi: {topic}
+        - Thời gian học tuần này: {study_hours} giờ.
+        - Mức độ phụ thuộc AI: {ai_dependency}.
+        - Mức độ rủi ro (risk level): {risk_level}.
+        - Tổng hints đã dùng trong các bài quiz gần nhất của topic này: {total_hints_used}.
+        - Kết quả các bài quiz gần nhất (đúng/tổng): {', '.join(recent_scores) if recent_scores else 'Chưa có'}.
+        """
+
+        # Gọi sang services lấy dữ liệu JSON chứa cả phân tích và câu hỏi
+        ai_response_data = await generate_adaptive_quiz(topic, student_context, num)
         
         return {
             "topic": topic,
             "type": "ai_adaptive",
-            "difficulty": difficulty,
-            "total_questions": len(ai_questions_array),
-            "questions": ai_questions_array
+            "weakness_summary": ai_response_data.get("weakness_summary", "Không có dữ liệu đánh giá."),
+            "study_materials": ai_response_data.get("study_materials", []),
+            "total_questions": len(ai_response_data.get("questions", [])),
+            "questions": ai_response_data.get("questions", [])
         }
     except Exception as e:
         raise HTTPException(

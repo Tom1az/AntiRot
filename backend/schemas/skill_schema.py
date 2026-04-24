@@ -76,6 +76,7 @@ class StudentSkillStatusResponse(StudentSkillStatusBase):
 class SkillNodeWithStatus(BaseModel):
     """Một node đã gắn kèm trạng thái học của sinh viên."""
     id: UUID
+    key: Optional[str] = None
     name: str
     description: Optional[str] = None
     category: str
@@ -89,3 +90,6 @@ class SkillGraphResponse(BaseModel):
     """Response trả về toàn bộ graph cho frontend React Flow."""
     nodes: List[SkillNodeWithStatus]
     edges: List[SkillEdgeResponse]
+    ai_insight: Optional[str] = None
+    recommended_next: Optional[str] = None
+    weakness_areas: Optional[List[str]] = None

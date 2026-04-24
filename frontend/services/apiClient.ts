@@ -73,9 +73,9 @@ export const getTeacherQuestions = (topic: string) =>
   api.get<TeacherQuestionsResponse>(`/student/quiz/${encodeURIComponent(topic)}/teacher-questions`).then((r) => r.data);
 
 /** Frame 3: Lấy câu hỏi Quiz do AI sinh ra */
-export const getAIQuestions = (topic: string, difficulty = 'medium', num = 3) =>
-  api.get<AIQuestionsResponse>(`/student/quiz/${encodeURIComponent(topic)}/ai-questions`, {
-    params: { difficulty, num },
+export const getAIQuestions = (studentId: string, topic: string, num = 3) =>
+  api.get<AIQuestionsResponse>(`/student/${studentId}/quiz/${encodeURIComponent(topic)}/ai-questions`, {
+    params: { num },
   }).then((r) => r.data);
 
 /** Frame 3: Nộp bài Quiz (gửi điểm + hints_used) */
@@ -131,5 +131,17 @@ export const generateTeacherQuiz = (topic: string, difficulty: string, num: numb
 /** Save Teacher Quiz */
 export const saveTeacherQuiz = (data: any) =>
   api.post<{ message: string, quiz_id: string }>(`/teacher/quiz/save`, data).then((r) => r.data);
+
+// =============================================================================
+// NHÓM API KNOWLEDGE GRAPH (SKILL TREE)
+// =============================================================================
+
+/** Lấy cây kỹ năng cá nhân hóa */
+export const getSkillGraph = (studentId: string, courseName: string) =>
+  api.get<any>(`/skill-tree/${studentId}/graph`, { params: { course_name: courseName } }).then((r) => r.data);
+
+/** Gọi AI tạo/tái tạo cây kỹ năng */
+export const generateSkillGraph = (studentId: string, courseName: string) =>
+  api.post<any>(`/skill-tree/${studentId}/generate`, { course_name: courseName }).then((r) => r.data);
 
 export default api;

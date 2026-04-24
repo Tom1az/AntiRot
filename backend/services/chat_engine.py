@@ -28,38 +28,44 @@ async def get_pedagogical_reply(history: list, user_input: str):
     response = chat.send_message(f"{PEDAGOGICAL_PROMPT}\n\nTeacher: {user_input}")
     return response.text
 
-async def generate_adaptive_quiz(topic: str, difficulty: str, num_questions: int = 3):
+async def generate_adaptive_quiz(topic: str, student_context: str, num_questions: int = 3):
     prompt = f"""
     Bạn là một chuyên gia giáo dục. Hãy tạo {num_questions} câu hỏi trắc nghiệm về chủ đề '{topic}'.
-    Mức độ khó của các câu hỏi này là: {difficulty} (easy/medium/hard).
+    
+    ĐÂY LÀ NGỮ CẢNH CỦA HỌC SINH (Hãy phân tích để quyết định độ khó và nội dung câu hỏi):
+    {student_context}
     
     YÊU CẦU BẮT BUỘC: 
-    Chỉ trả về đúng một mảng JSON (không giải thích thêm, không dùng markdown block). 
-    Cấu trúc mỗi object trong mảng phải giống hệt như sau:
-    [
-        {{
-            "id": "Tự sinh một ID ngẫu nhiên (số nguyên)",
-            "q": "Nội dung câu hỏi",
-            "options": ["Đáp án A", "Đáp án B", "Đáp án C", "Đáp án D"],
-            "answer": "Ghi lại chính xác 1 đáp án đúng từ mảng options",
-            "hint": "Một gợi ý kiểu Socratic để giúp học sinh tự suy luận (không nói thẳng đáp án)"
-        }}
-    ]
+    - Nếu học sinh lạm dụng Hint (Gợi ý) nhiều hoặc trả lời sai nhiều, hãy cho câu hỏi dễ (easy) hoặc trung bình (medium) tập trung vào lý thuyết cốt lõi.
+    - Phải trộn lẫn các độ khó (easy, medium, hard) sao cho phù hợp với năng lực hiện tại.
+    - Cấu trúc trả về CHỈ LÀ MỘT JSON OBJECT (không markdown, không giải thích thêm), có cấu trúc chính xác như sau:
+    {{
+        "weakness_summary": "Phân tích 1-2 câu về điểm yếu hoặc xu hướng học tập của học sinh dựa trên ngữ cảnh.",
+        "study_materials": ["Tài liệu ôn tập 1", "Tài liệu ôn tập 2"],
+        "questions": [
+            {{
+                "id": 123,
+                "difficulty": "easy hoặc medium hoặc hard",
+                "q": "Nội dung câu hỏi",
+                "options": ["Đáp án A", "Đáp án B", "Đáp án C", "Đáp án D"],
+                "answer": "Ghi lại chính xác 1 đáp án đúng từ mảng options",
+                "hint": "Một gợi ý kiểu Socratic để giúp học sinh tự suy luận (không nói thẳng đáp án)"
+            }}
+        ]
+    }}
     """
     
     response = model.generate_content(prompt)
     raw_text = response.text.strip()
     
-    # Xử lý dọn dẹp nếu AI lỡ bọc chuỗi ```json ... ```
     if raw_text.startswith("```json"):
         raw_text = raw_text[7:-3].strip()
     elif raw_text.startswith("```"):
         raw_text = raw_text[3:-3].strip()
         
     try:
-        quiz_array = json.loads(raw_text)
-        return quiz_array
+        quiz_data = json.loads(raw_text)
+        return quiz_data
     except json.JSONDecodeError:
-        # Dự phòng nếu AI trả về lỗi định dạng
         print("Lỗi parse JSON từ AI:", raw_text)
         raise Exception("AI không trả về đúng định dạng JSON.")

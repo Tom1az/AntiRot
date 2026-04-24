@@ -109,7 +109,9 @@ export interface TeacherQuestionsResponse {
 export interface AIQuestionsResponse {
   topic: string;
   type: string;
-  difficulty: string;
+  difficulty?: string;
+  weakness_summary?: string;
+  study_materials?: string[];
   total_questions: number;
   questions: QuizQuestion[];
 }
