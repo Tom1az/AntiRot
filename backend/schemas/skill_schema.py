@@ -86,6 +86,15 @@ class SkillNodeWithStatus(BaseModel):
     mastery_pct: int = 0
 
 
+class TimeAllocation(BaseModel):
+    topic: str
+    percentage: int
+
+class ScheduleItem(BaseModel):
+    day: str
+    task: str
+    duration: str
+
 class SkillGraphResponse(BaseModel):
     """Response trả về toàn bộ graph cho frontend React Flow."""
     nodes: List[SkillNodeWithStatus]
@@ -93,3 +102,5 @@ class SkillGraphResponse(BaseModel):
     ai_insight: Optional[str] = None
     recommended_next: Optional[str] = None
     weakness_areas: Optional[List[str]] = None
+    time_allocation: Optional[List[TimeAllocation]] = None
+    schedule: Optional[List[ScheduleItem]] = None

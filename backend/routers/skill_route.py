@@ -97,7 +97,7 @@ async def generate_skill_graph(
         raise HTTPException(status_code=400, detail="Thiếu course_name.")
 
     try:
-        return await generate_and_save_graph(student_id, course_name, db)
+        return await generate_and_save_graph(student_id, course_name, db, data.get("target_level"), data.get("hours_per_day"))
     except HTTPException:
         raise
     except Exception as e:
@@ -113,7 +113,9 @@ async def generate_skill_graph(
 async def generate_and_save_graph(
     student_id: uuid.UUID,
     course_name: str,
-    db: Session
+    db: Session,
+    target_level: str = None,
+    hours_per_day: int = None
 ) -> SkillGraphResponse:
     """Logic chính: load KB, gom context, gọi AI, lưu DB, trả response."""
 
@@ -165,6 +167,8 @@ async def generate_and_save_graph(
 {quiz_summary if quiz_summary else '    Chưa có.'}
     - Lịch sử Chat Socratic gần nhất:
 {chat_summary if chat_summary else '    Chưa có.'}
+    - MỤC TIÊU CỦA HỌC SINH (Hãy điều chỉnh thời gian biểu theo đây):
+      + Số giờ học/ngày: {hours_per_day if hours_per_day else 2} giờ.
     """
 
     # 3. Gọi AI
@@ -268,6 +272,8 @@ async def generate_and_save_graph(
         ai_insight=ai_result.get("ai_insight"),
         recommended_next=ai_result.get("recommended_next"),
         weakness_areas=ai_result.get("weakness_areas"),
+        time_allocation=ai_result.get("time_allocation"),
+        schedule=ai_result.get("schedule"),
     )
 
 

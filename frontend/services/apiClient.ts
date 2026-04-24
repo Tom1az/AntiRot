@@ -110,6 +110,7 @@ export const searchStudents = (name: string) =>
 export const getClassAnalytics = () =>
   api.get<ClassAnalyticsResponse>(`/teacher/class-analytics`).then((r) => r.data);
 
+
 /** Frame 4: Dashboard tổng quan giáo viên */
 export const getTeacherDashboardSummary = () =>
   api.get<TeacherDashboardSummary>(`/teacher/dashboard-summary`).then((r) => r.data);
@@ -141,7 +142,11 @@ export const getSkillGraph = (studentId: string, courseName: string) =>
   api.get<any>(`/skill-tree/${studentId}/graph`, { params: { course_name: courseName } }).then((r) => r.data);
 
 /** Gọi AI tạo/tái tạo cây kỹ năng */
-export const generateSkillGraph = (studentId: string, courseName: string) =>
-  api.post<any>(`/skill-tree/${studentId}/generate`, { course_name: courseName }).then((r) => r.data);
+export const generateSkillGraph = (studentId: string, courseName: string, targetLevel?: string, hoursPerDay?: number) =>
+  api.post<any>(`/skill-tree/${studentId}/generate`, { 
+    course_name: courseName,
+    target_level: targetLevel,
+    hours_per_day: hoursPerDay
+  }).then((r) => r.data);
 
 export default api;

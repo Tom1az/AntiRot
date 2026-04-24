@@ -5,8 +5,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genai.GenerativeModel('gemini-3.1-flash-lite-preview')
 
+# Hỗ trợ Tuned Model nếu đã train xong, ngược lại dùng Base Model
+TUNED_MODEL = os.getenv("TUNED_MODEL_NAME")
+if TUNED_MODEL:
+    model = genai.GenerativeModel(TUNED_MODEL)
+    print(f"✅ Đang sử dụng mô hình Fine-tuned: {TUNED_MODEL}")
+else:
+    model = genai.GenerativeModel('gemini-3.1-flash-lite-preview')
+    print("⚠️ Chưa có TUNED_MODEL_NAME, đang dùng base model.")
 
 async def generate_ai_roadmap(course_kb: dict, student_context: str) -> dict:
     """
@@ -43,6 +50,8 @@ Quy tắc:
 - Nếu học sinh đang học, hints vừa phải, điểm trung bình → "in-progress", mastery_pct 30-69.
 - Nếu chưa có dữ liệu hoặc các node tiên quyết chưa mastered → "locked", mastery_pct 0-29.
 - Node dễ (easy) có xu hướng mastered nhanh hơn node khó (hard).
+- Căn cứ vào điểm yếu (weakness_areas) và ai_dependency, hãy phân bổ thời gian học tập (tổng 100%) cho các node cần cải thiện nhất. Nếu là lộ trình tổng hợp, TÊN TOPIC TRONG time_allocation PHẢI CÓ TÊN MÔN HỌC (VD: [DSA] Trees & Graphs).
+- Bắt buộc lập một Thời gian biểu (Schedule) chi tiết, bám sát các môn/kiến thức phụ thuộc. Nếu đây là lộ trình tổng hợp nhiều môn, HÃY GHI RÕ [Tên môn học] phía trước Task (VD: [DSA] Ôn lại Trees & Graphs).
 
 TRẢ VỀ ĐÚNG 1 JSON OBJECT (không markdown, không giải thích):
 {{
@@ -52,7 +61,15 @@ TRẢ VỀ ĐÚNG 1 JSON OBJECT (không markdown, không giải thích):
     }},
     "ai_insight": "1-2 câu phân tích tổng quan năng lực học sinh và lời khuyên cụ thể.",
     "recommended_next": "key của node nên học tiếp theo",
-    "weakness_areas": ["key_1", "key_2"]
+    "weakness_areas": ["key_1", "key_2"],
+    "time_allocation": [
+        {{"topic": "[Tên Môn] Tên topic 1", "percentage": 70}},
+        {{"topic": "[Tên Môn] Tên topic 2", "percentage": 30}}
+    ],
+    "schedule": [
+        {{"day": "Thứ 2", "task": "Đọc lại lý thuyết phần A", "duration": "2 giờ"}},
+        {{"day": "Thứ 3", "task": "Làm bài tập phần A để quen dần mà không dùng hint", "duration": "3 giờ"}}
+    ]
 }}
 """
 
@@ -82,6 +99,10 @@ TRẢ VỀ ĐÚNG 1 JSON OBJECT (không markdown, không giải thích):
             result["recommended_next"] = node_keys[0]
         if "weakness_areas" not in result:
             result["weakness_areas"] = []
+        if "time_allocation" not in result:
+            result["time_allocation"] = []
+        if "schedule" not in result:
+            result["schedule"] = []
             
         return result
 
@@ -92,6 +113,8 @@ TRẢ VỀ ĐÚNG 1 JSON OBJECT (không markdown, không giải thích):
             "node_statuses": {k: {"status": "locked", "mastery_pct": 0} for k in node_keys},
             "ai_insight": "AI đang bận, vui lòng thử lại sau.",
             "recommended_next": node_keys[0],
-            "weakness_areas": []
+            "weakness_areas": [],
+            "time_allocation": [],
+            "schedule": []
         }
         return fallback

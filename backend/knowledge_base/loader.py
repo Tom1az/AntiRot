@@ -42,6 +42,17 @@ def load_course_kb(course_module_name: str) -> dict:
     Load Knowledge Base (cây kỹ năng chuẩn) cho một môn học.
     Trả về dict { subject, full_name, nodes: [...], edges: [...] }
     """
+    if course_module_name.lower() == "global":
+        merged_kb = {"subject": "global", "full_name": "Tất cả môn học (Global Roadmap)", "nodes": [], "edges": []}
+        for filename in ["dsa.json", "ltnc.json", "hdh.json"]:
+            path = os.path.join(KB_DIR, filename)
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    merged_kb["nodes"].extend(data.get("nodes", []))
+                    merged_kb["edges"].extend(data.get("edges", []))
+        return merged_kb
+
     subject = detect_subject(course_module_name)
     filename = SUBJECT_MAP.get(subject, "dsa.json")
     filepath = os.path.join(KB_DIR, filename)
