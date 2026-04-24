@@ -41,10 +41,13 @@ class AuthResponse(BaseModel):
 class UserResponse(UserBase):
     id: UUID
     username: str
+    full_name: str
+    role: str
+    grade: Optional[str] = None
+    
     total_points: int
     current_streak: int
     study_hours_this_week: float
-    created_at: datetime
 
     class Config:
         from_attributes = True

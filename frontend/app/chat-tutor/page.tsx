@@ -10,6 +10,9 @@ interface ChatMessage {
   sender: 'student' | 'tutor';
   text: string;
   timestamp: string;
+  agent_used?: string;
+  retry_count?: number;
+  validation_score?: number;
 }
 
 export default function ChatTutorPage() {
@@ -53,6 +56,9 @@ export default function ChatTutorPage() {
                   sender: msg.role === 'user' ? 'student' : 'tutor',
                   text: msg.content,
                   timestamp: new Date(session.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+                  agent_used: session.agent_used,
+                  retry_count: session.retry_count,
+                  validation_score: session.validation_score,
                 });
               });
             }
@@ -104,6 +110,9 @@ export default function ChatTutorPage() {
           sender: 'tutor',
           text: response.reply,
           timestamp: 'Just now',
+          agent_used: response.agent_used,
+          retry_count: response.retry_count,
+          validation_score: response.validation_score,
         },
       ]);
     } catch (err: any) {
@@ -189,7 +198,16 @@ export default function ChatTutorPage() {
                 ? 'bg-blue-600 text-white rounded-tr-sm'
                 : 'bg-[#F6FAFE] text-slate-700 rounded-tl-sm border border-blue-50'
                 }`}>
-                {msg.sender === 'tutor' && <p className="text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest">Socratic Coach</p>}
+                {msg.sender === 'tutor' && (
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Socratic Coach</p>
+                    {msg.agent_used && (
+                      <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold uppercase ${msg.agent_used === 'agent_1' ? 'bg-indigo-100 text-indigo-600' : 'bg-fuchsia-100 text-fuchsia-600'}`}>
+                        {msg.agent_used === 'agent_1' ? 'Local AI' : 'Gemini Fallback'}
+                      </span>
+                    )}
+                  </div>
+                )}
                 <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
                 {msg.sender === 'student' && <p className="text-[10px] text-blue-200 mt-2 text-right uppercase">Sent {msg.timestamp}</p>}
               </div>

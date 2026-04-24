@@ -11,6 +11,8 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- 0. XOÁ BẢNG CŨ (nếu đã tồn tại) — Cần thiết để cập nhật schema mới
 -- Thứ tự DROP ngược với thứ tự tạo (bảng con trước, bảng cha sau)
 -- ============================================================================
+DROP TABLE IF EXISTS course_enrollments CASCADE;
+DROP TABLE IF EXISTS courses CASCADE;
 DROP TABLE IF EXISTS student_skill_status CASCADE;
 DROP TABLE IF EXISTS skill_edges CASCADE;
 DROP TABLE IF EXISTS skill_nodes CASCADE;
@@ -37,6 +39,29 @@ CREATE TABLE IF NOT EXISTS users (
     current_streak INTEGER DEFAULT 0,
     study_hours_this_week FLOAT DEFAULT 0.0,
     created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================================
+-- 1.1. BẢNG COURSES (Khóa học do giáo viên tạo)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS courses (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    teacher_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR NOT NULL,                      -- VD: "[DSA] Graph Search (BFS/DFS)"
+    subject VARCHAR NOT NULL,                   -- VD: "dsa", "ltnc", "hdh"
+    description TEXT,
+    target_grade VARCHAR,                       -- Lớp mục tiêu (VD: "K22 - CSE")
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================================
+-- 1.2. BẢNG COURSE_ENROLLMENTS (Đăng ký học sinh vào khóa)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS course_enrollments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    course_id UUID REFERENCES courses(id) ON DELETE CASCADE,
+    student_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    enrolled_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================================
@@ -123,6 +148,9 @@ CREATE TABLE IF NOT EXISTS ai_recovery_plans (
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS skill_nodes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    student_id UUID REFERENCES users(id) ON DELETE CASCADE,  -- Cây riêng cho mỗi học sinh
+    course_name VARCHAR,                        -- Tên khóa học
+    key VARCHAR,                                -- Key ngắn gọn (VD: "big_o")
     name VARCHAR NOT NULL,
     description TEXT,
     category VARCHAR NOT NULL DEFAULT 'dsa',    -- dsa | ltnc | hdh ...
@@ -157,9 +185,10 @@ CREATE TABLE IF NOT EXISTS student_skill_status (
 -- ============================================================================
 
 -- 10a. XOÁ DỮ LIỆU CŨ (theo thứ tự FK)
-TRUNCATE student_skill_status, skill_edges, skill_nodes,
+TRUNCATE course_enrollments, courses,
+         student_skill_status, skill_edges, skill_nodes,
          ai_recovery_plans, alert_insights, chat_sessions,
-         quiz_history, learning_progress, users
+         quiz_history, teacher_quizzes, learning_progress, users
          CASCADE;
 
 -- 10b. USERS (2 học sinh + 1 giáo viên) — Password chung: 123456
@@ -169,7 +198,29 @@ INSERT INTO users (id, username, password_hash, role, full_name, grade, avatar_u
     ('b222f1ee-6c54-4b01-90e6-d701748f0855', 'tuankhoi',   '$2b$12$oz03gdYfyPU8utJ/3RUlW.Hcur.LkeyLjJk8rSB2w2t16WN2gm71u', 'student', 'Tuấn Khôi',   'K22 - CSE', 'https://ui-avatars.com/api/?name=Tuan+Khoi',  8900, 45, 14.0),
     ('c333f1ee-6c54-4b01-90e6-d701748f0856', 'thayminh',   '$2b$12$oz03gdYfyPU8utJ/3RUlW.Hcur.LkeyLjJk8rSB2w2t16WN2gm71u', 'teacher', 'Thầy Minh',   NULL,        'https://ui-avatars.com/api/?name=Thay+Minh',     0,  0,  0.0);
 
--- 10c. LEARNING PROGRESS
+-- 10c. COURSES (Khóa học do Thầy Minh tạo)
+INSERT INTO courses (id, teacher_id, name, subject, description, target_grade) VALUES
+    ('d001f1ee-0000-0000-0000-000000000001', 'c333f1ee-6c54-4b01-90e6-d701748f0856', '[DSA] Graph Search (BFS/DFS)',          'dsa',  'Module tìm kiếm đồ thị: BFS, DFS và ứng dụng.', 'K22 - CSE'),
+    ('d001f1ee-0000-0000-0000-000000000002', 'c333f1ee-6c54-4b01-90e6-d701748f0856', '[DSA] Dynamic Programming',             'dsa',  'Quy hoạch động cơ bản đến nâng cao.',            'K22 - CSE'),
+    ('d001f1ee-0000-0000-0000-000000000003', 'c333f1ee-6c54-4b01-90e6-d701748f0856', '[LTNC] Memory Allocation & Pointers',   'ltnc', 'Cấp phát bộ nhớ và con trỏ trong C++.',          'K22 - CSE'),
+    ('d001f1ee-0000-0000-0000-000000000004', 'c333f1ee-6c54-4b01-90e6-d701748f0856', '[LTNC] STL Containers & Iterators',     'ltnc', 'Thư viện chuẩn STL: vector, map, set...',        'K22 - CSE'),
+    ('d001f1ee-0000-0000-0000-000000000005', 'c333f1ee-6c54-4b01-90e6-d701748f0856', '[HĐH] Deadlock & Synchronization',     'hdh',  'Đồng bộ hóa tiến trình và bế tắc.',              'K22 - CSE'),
+    ('d001f1ee-0000-0000-0000-000000000006', 'c333f1ee-6c54-4b01-90e6-d701748f0856', '[HĐH] Memory Management (Paging)',      'hdh',  'Quản lý bộ nhớ: phân trang, phân đoạn.',         'K22 - CSE'),
+    ('d001f1ee-0000-0000-0000-000000000007', 'c333f1ee-6c54-4b01-90e6-d701748f0856', '[HĐH] Virtual Memory & TLB',            'hdh',  'Bộ nhớ ảo, TLB, Page Replacement.',              'K22 - CSE');
+
+-- 10d. COURSE ENROLLMENTS (Gán học sinh vào khóa)
+INSERT INTO course_enrollments (course_id, student_id) VALUES
+    -- Kem Đá: 4 khóa
+    ('d001f1ee-0000-0000-0000-000000000001', 'a111f1ee-6c54-4b01-90e6-d701748f0854'),
+    ('d001f1ee-0000-0000-0000-000000000003', 'a111f1ee-6c54-4b01-90e6-d701748f0854'),
+    ('d001f1ee-0000-0000-0000-000000000005', 'a111f1ee-6c54-4b01-90e6-d701748f0854'),
+    ('d001f1ee-0000-0000-0000-000000000006', 'a111f1ee-6c54-4b01-90e6-d701748f0854'),
+    -- Tuấn Khôi: 3 khóa
+    ('d001f1ee-0000-0000-0000-000000000002', 'b222f1ee-6c54-4b01-90e6-d701748f0855'),
+    ('d001f1ee-0000-0000-0000-000000000004', 'b222f1ee-6c54-4b01-90e6-d701748f0855'),
+    ('d001f1ee-0000-0000-0000-000000000007', 'b222f1ee-6c54-4b01-90e6-d701748f0855');
+
+-- 10e. LEARNING PROGRESS
 INSERT INTO learning_progress (student_id, course_module_name, progress_pct, mastery_score, ai_dependency, risk_level, time_spent_mins) VALUES
     -- Kem Đá (rủi ro cao, phụ thuộc AI nhiều)
     ('a111f1ee-6c54-4b01-90e6-d701748f0854', '[HĐH] Deadlock & Synchronization',      100, 35, 'high', 'high_risk', 120),
@@ -181,68 +232,34 @@ INSERT INTO learning_progress (student_id, course_module_name, progress_pct, mas
     ('b222f1ee-6c54-4b01-90e6-d701748f0855', '[DSA] Dynamic Programming',               75,  92, 'none', 'optimal',   300),
     ('b222f1ee-6c54-4b01-90e6-d701748f0855', '[LTNC] STL Containers & Iterators',      100, 90, 'low',  'optimal',   140);
 
--- 10d. QUIZ HISTORY
+-- 10f. QUIZ HISTORY
 INSERT INTO quiz_history (student_id, topic_name, difficulty_level, score, hints_used, quiz_details) VALUES
     ('a111f1ee-6c54-4b01-90e6-d701748f0854', '[LTNC] Pointers & References', 'advanced', 60, 5,
         '{"questions": [{"q": "Dangling pointer", "result": "incorrect", "hint": true}], "ai_feedback": "Yếu con trỏ, lạm dụng hint."}'::jsonb),
     ('b222f1ee-6c54-4b01-90e6-d701748f0855', '[DSA] Dynamic Programming', 'advanced', 100, 0,
         '{"questions": [{"q": "State transition", "result": "correct", "hint": false}], "ai_feedback": "Tư duy sắc bén."}'::jsonb);
 
--- 10e. CHAT SESSIONS
+-- 10g. CHAT SESSIONS
 INSERT INTO chat_sessions (student_id, topic_name, messages, ai_summary) VALUES
     ('a111f1ee-6c54-4b01-90e6-d701748f0854', '[LTNC] Segmentation Fault',
         '[{"role": "user", "content": "Code bị Segmentation fault rồi, sửa hàm delete này với."}, {"role": "ai", "content": "Lỗi này do truy cập vùng nhớ không hợp lệ. Bạn free(temp) rồi lại gọi temp->next?"}]'::jsonb,
         'Học sinh đòi fix bug hộ. AI dùng Socratic.');
 
--- 10f. ALERTS
+-- 10h. ALERTS
 INSERT INTO alert_insights (student_id, type, title, content, is_resolved) VALUES
     ('a111f1ee-6c54-4b01-90e6-d701748f0854', 'intervention_needed', 'SOS: Lỗ hổng LTNC', 'AI Dependency: 95%. Cần can thiệp gấp.', FALSE);
 
--- 10g. RECOVERY PLANS
+-- 10i. RECOVERY PLANS
 INSERT INTO ai_recovery_plans (student_id, plan_details, status) VALUES
     ('a111f1ee-6c54-4b01-90e6-d701748f0854',
         '{"plan_name": "Chinh phục Con trỏ", "phases": [{"name": "Phase 1: Memory Map", "status": "in_progress"}]}'::jsonb,
         'active');
 
--- 10h. SKILL NODES (Cây kỹ năng DSA)
-INSERT INTO skill_nodes (id, name, description, category, position_x, position_y) VALUES
-    ('a1000000-0000-0000-0000-000000000001', 'Big-O Notation',        'Phân tích độ phức tạp thuật toán',  'dsa', 400,  50),
-    ('a1000000-0000-0000-0000-000000000002', 'Arrays & Strings',      'Mảng một chiều, chuỗi ký tự',      'dsa', 250, 200),
-    ('a1000000-0000-0000-0000-000000000003', 'Linked Lists',          'Danh sách liên kết đơn, đôi',       'dsa', 550, 200),
-    ('a1000000-0000-0000-0000-000000000004', 'Hash Tables',           'Bảng băm, HashMap, HashSet',        'dsa', 250, 350),
-    ('a1000000-0000-0000-0000-000000000005', 'Stacks & Queues',       'Ngăn xếp và Hàng đợi',              'dsa', 550, 350),
-    ('a1000000-0000-0000-0000-000000000006', 'Trees & Graphs',        'Cây nhị phân, đồ thị',              'dsa', 400, 500),
-    ('a1000000-0000-0000-0000-000000000007', 'Dynamic Programming',   'Quy hoạch động',                    'dsa', 400, 650),
-    ('a1000000-0000-0000-0000-000000000008', 'Sorting Algorithms',    'Các thuật toán sắp xếp',            'dsa', 100, 500);
-
--- 10i. SKILL EDGES (Liên kết tiên quyết)
-INSERT INTO skill_edges (source_node_id, target_node_id) VALUES
-    ('a1000000-0000-0000-0000-000000000001', 'a1000000-0000-0000-0000-000000000002'),
-    ('a1000000-0000-0000-0000-000000000001', 'a1000000-0000-0000-0000-000000000003'),
-    ('a1000000-0000-0000-0000-000000000002', 'a1000000-0000-0000-0000-000000000004'),
-    ('a1000000-0000-0000-0000-000000000003', 'a1000000-0000-0000-0000-000000000005'),
-    ('a1000000-0000-0000-0000-000000000004', 'a1000000-0000-0000-0000-000000000006'),
-    ('a1000000-0000-0000-0000-000000000005', 'a1000000-0000-0000-0000-000000000006'),
-    ('a1000000-0000-0000-0000-000000000004', 'a1000000-0000-0000-0000-000000000008'),
-    ('a1000000-0000-0000-0000-000000000006', 'a1000000-0000-0000-0000-000000000007');
-
--- 10j. STUDENT SKILL STATUS (Trạng thái kỹ năng của Tuấn Khôi)
-INSERT INTO student_skill_status (student_id, skill_node_id, status, mastery_pct) VALUES
-    ('b222f1ee-6c54-4b01-90e6-d701748f0855', 'a1000000-0000-0000-0000-000000000001', 'mastered',     100),
-    ('b222f1ee-6c54-4b01-90e6-d701748f0855', 'a1000000-0000-0000-0000-000000000002', 'mastered',      95),
-    ('b222f1ee-6c54-4b01-90e6-d701748f0855', 'a1000000-0000-0000-0000-000000000003', 'mastered',      90),
-    ('b222f1ee-6c54-4b01-90e6-d701748f0855', 'a1000000-0000-0000-0000-000000000004', 'mastered',      88),
-    ('b222f1ee-6c54-4b01-90e6-d701748f0855', 'a1000000-0000-0000-0000-000000000005', 'in-progress',   60),
-    ('b222f1ee-6c54-4b01-90e6-d701748f0855', 'a1000000-0000-0000-0000-000000000006', 'locked',         0),
-    ('b222f1ee-6c54-4b01-90e6-d701748f0855', 'a1000000-0000-0000-0000-000000000007', 'locked',         0),
-    ('b222f1ee-6c54-4b01-90e6-d701748f0855', 'a1000000-0000-0000-0000-000000000008', 'locked',         0);
-
 -- ============================================================================
--- DONE! 9 bảng đã được tạo + seed data đầy đủ.
+-- DONE! 11 bảng đã được tạo + seed data đầy đủ.
 --
 -- TÀI KHOẢN ĐĂNG NHẬP MẪU:
 --   Học sinh 1:  username: kemda       | password: 123456
 --   Học sinh 2:  username: tuankhoi    | password: 123456
 --   Giáo viên:   username: thayminh    | password: 123456
 -- ============================================================================
-

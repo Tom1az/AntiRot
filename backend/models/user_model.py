@@ -8,10 +8,10 @@ class User(Base):
     __tablename__ = "users"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    username = Column(String, unique=True, nullable=False)    # Tên đăng nhập (viết liền, không dấu)
-    password_hash = Column(String, nullable=False)            # Mật khẩu đã băm (bcrypt)
-    role = Column(String, nullable=False, default="student")  # "student" | "teacher"
-    full_name = Column(String, nullable=False)                # Họ tên hiển thị (có dấu)
+    username = Column(String, unique=True, nullable=False)    
+    password_hash = Column(String, nullable=False)            
+    role = Column(String, nullable=False, default="student")  
+    full_name = Column(String, nullable=False)
     grade = Column(String)
     avatar_url = Column(String)
     

@@ -10,11 +10,14 @@ class SkillNode(Base):
     __tablename__ = "skill_nodes"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String, nullable=False)                     # Ví dụ: "Arrays & Strings"
-    description = Column(Text, nullable=True)                 # Mô tả chi tiết
-    category = Column(String, nullable=False, default="dsa")  # Nhóm môn: dsa, ltnc, hdh...
-    position_x = Column(Integer, default=0)                   # Toạ độ x để render trên graph
-    position_y = Column(Integer, default=0)                   # Toạ độ y để render trên graph
+    student_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)  # Cây riêng cho mỗi học sinh
+    course_name = Column(String, nullable=True)                   # Tên khóa học (VD: "[DSA] Graph Search")
+    key = Column(String, nullable=True)                           # Key ngắn (VD: "big_o", "arrays")
+    name = Column(String, nullable=False)                         # Tên hiển thị (VD: "Arrays & Strings")
+    description = Column(Text, nullable=True)                     # Mô tả chi tiết
+    category = Column(String, nullable=False, default="dsa")      # Nhóm môn: dsa, ltnc, hdh
+    position_x = Column(Integer, default=0)                       # Toạ độ x để render trên graph
+    position_y = Column(Integer, default=0)                       # Toạ độ y để render trên graph
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
