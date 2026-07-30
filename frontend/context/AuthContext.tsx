@@ -1,6 +1,7 @@
 'use client';
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import type { User } from '@/types/api';
+import { invalidateApiCache } from '@/services/apiClient';
 
 interface AuthContextType {
   user: User | null;
@@ -15,7 +16,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Khôi phục session từ localStorage khi mount
   useEffect(() => {
     try {
       const saved = localStorage.getItem('antirot_user');
@@ -26,18 +26,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = (userData: User) => {
+  const login = useCallback((userData: User) => {
     setUser(userData);
     localStorage.setItem('antirot_user', JSON.stringify(userData));
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null);
     localStorage.removeItem('antirot_user');
-  };
+    invalidateApiCache();
+  }, []);
+
+  const value = useMemo(
+    () => ({ user, isLoading, login, logout }),
+    [user, isLoading, login, logout],
+  );
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

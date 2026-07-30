@@ -5,7 +5,7 @@ import json
 
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genai.GenerativeModel('gemini-3.1-flash-lite-preview')
+model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-flash-latest"))
 
 # Prompt này ép AI phải đóng vai Socratic
 SOCRATIC_PROMPT = """Bạn là Socratic Coach. 

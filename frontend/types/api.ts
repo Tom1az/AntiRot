@@ -48,6 +48,9 @@ export interface ChatSession {
   topic_name: string;
   messages: { role: string; content: string }[];
   ai_summary: string;
+  agent_used?: string;
+  retry_count?: number;
+  validation_score?: number;
   created_at: string;
 }
 
@@ -90,6 +93,9 @@ export interface ChatMessagePayload {
 export interface ChatReplyResponse {
   reply: string;
   session_id: string;
+  agent_used?: string;
+  retry_count?: number;
+  validation_score?: number;
 }
 
 export interface QuizQuestion {
@@ -98,6 +104,7 @@ export interface QuizQuestion {
   q: string;
   options: string[];
   hint: string;
+  answer?: string;
 }
 
 export interface TeacherQuestionsResponse {

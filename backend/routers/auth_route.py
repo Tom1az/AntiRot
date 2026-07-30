@@ -27,7 +27,10 @@ def create_access_token(data: dict):
     expire_minutes = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))
     expire = datetime.now(timezone.utc) + timedelta(minutes=expire_minutes)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, os.getenv("SECRET_KEY", "antirot_secret"), algorithm=os.getenv("ALGORITHM", "HS256"))
+    secret_key = os.getenv("SECRET_KEY", "antirot_secret")
+    if not secret_key:
+        raise RuntimeError("SECRET_KEY is not set")
+    encoded_jwt = jwt.encode(to_encode, secret_key, algorithm=os.getenv("ALGORITHM", "HS256"))
     return encoded_jwt
 
 # ============================================================================

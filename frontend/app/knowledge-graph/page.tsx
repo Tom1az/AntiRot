@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import ReactFlow, { Background, Controls, Node, Edge, BackgroundVariant } from 'reactflow';
 import 'reactflow/dist/style.css';
 import SkillNode from '@/components/SkillNode';
@@ -8,6 +8,23 @@ import { useAuth } from '@/context/AuthContext';
 import { getStudentDashboard, getSkillGraph, generateSkillGraph } from '@/services/apiClient';
 
 const nodeTypes = { skill: SkillNode };
+
+const GraphCanvas = memo(function GraphCanvas({ nodes, edges }: { nodes: Node[]; edges: Edge[] }) {
+  return (
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      nodeTypes={nodeTypes}
+      fitView
+      attributionPosition="bottom-left"
+      minZoom={0.4}
+      maxZoom={1.5}
+    >
+      <Background color="#cbd5e1" variant={BackgroundVariant.Dots} gap={24} size={2} />
+      <Controls className="bg-white! border-slate-200! fill-slate-600! shadow-sm" />
+    </ReactFlow>
+  );
+});
 
 export default function KnowledgeGraphPage() {
   const { user } = useAuth();
@@ -45,6 +62,47 @@ export default function KnowledgeGraphPage() {
     fetchGraph();
   }, [selectedCourse, studentId]);
 
+  const mapToReactFlow = useCallback((data: any) => {
+    if (!data?.nodes) return;
+
+    const recommendedKey = data.recommended_next;
+    const byId = new Map<string, any>(data.nodes.map((n: any) => [String(n.id), n]));
+
+    const rfNodes: Node[] = data.nodes.map((n: any) => ({
+      id: String(n.id),
+      type: 'skill',
+      position: { x: n.position_x, y: n.position_y },
+      data: {
+        label: n.name,
+        status: n.status,
+        mastery_pct: n.mastery_pct,
+        recommended: n.key === recommendedKey,
+      },
+    }));
+
+    const rfEdges: Edge[] = (data.edges || []).map((e: any) => {
+      const sourceNode = byId.get(String(e.source_node_id));
+      const targetNode = byId.get(String(e.target_node_id));
+      const isMastered = sourceNode?.status === 'mastered';
+      const isInProgress = sourceNode?.status === 'in-progress';
+      const isRecommendedEdge = targetNode?.key === recommendedKey;
+
+      return {
+        id: String(e.id),
+        source: String(e.source_node_id),
+        target: String(e.target_node_id),
+        animated: Boolean(isRecommendedEdge),
+        style: {
+          stroke: isMastered ? '#06b6d4' : isInProgress ? '#9333ea' : '#cbd5e1',
+          strokeWidth: isRecommendedEdge ? 2.5 : 2,
+        },
+      };
+    });
+
+    setNodes(rfNodes);
+    setEdges(rfEdges);
+  }, []);
+
   const fetchGraph = async () => {
     if (!selectedCourse || !studentId) return;
     setLoading(true);
@@ -75,47 +133,11 @@ export default function KnowledgeGraphPage() {
     }
   };
 
-  const mapToReactFlow = (data: any) => {
-    if (!data?.nodes) return;
-
-    const recommendedKey = data.recommended_next;
-
-    const rfNodes: Node[] = data.nodes.map((n: any) => ({
-      id: String(n.id),
-      type: 'skill',
-      position: { x: n.position_x, y: n.position_y },
-      data: {
-        label: n.name,
-        status: n.status,
-        mastery_pct: n.mastery_pct,
-        recommended: n.key === recommendedKey,
-      },
-    }));
-
-    const rfEdges: Edge[] = (data.edges || []).map((e: any) => {
-      // Determine edge style based on source node status
-      const sourceNode = data.nodes.find((n: any) => String(n.id) === String(e.source_node_id));
-      const isMastered = sourceNode?.status === 'mastered';
-      const isInProgress = sourceNode?.status === 'in-progress';
-
-      return {
-        id: String(e.id),
-        source: String(e.source_node_id),
-        target: String(e.target_node_id),
-        animated: isMastered || isInProgress,
-        style: {
-          stroke: isMastered ? '#06b6d4' : isInProgress ? '#9333ea' : '#cbd5e1',
-          strokeWidth: 2,
-        },
-      };
-    });
-
-    setNodes(rfNodes);
-    setEdges(rfEdges);
-  };
-
   // Stats
-  const masteredCount = graphData?.nodes?.filter((n: any) => n.status === 'mastered').length || 0;
+  const masteredCount = useMemo(
+    () => graphData?.nodes?.filter((n: any) => n.status === 'mastered').length || 0,
+    [graphData],
+  );
   const totalCount = graphData?.nodes?.length || 0;
 
   // Risk badge color
@@ -136,7 +158,7 @@ export default function KnowledgeGraphPage() {
   }
 
   return (
-    <div className="h-full flex flex-col gap-6 animate-in fade-in duration-500">
+    <div className="h-full flex flex-col gap-6 animate-in fade-in duration-150">
       
       {/* Header Section */}
       <div className="bg-white rounded-4xl p-8 text-slate-800 relative overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white">
@@ -282,26 +304,31 @@ export default function KnowledgeGraphPage() {
             </div>
           )}
 
-          {/* React Flow */}
           {selectedCourse && nodes.length > 0 && (
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              nodeTypes={nodeTypes}
-              fitView
-              attributionPosition="bottom-left"
-              minZoom={0.4}
-              maxZoom={1.5}
-            >
-              <Background color="#cbd5e1" variant={BackgroundVariant.Dots} gap={24} size={2} />
-              <Controls className="bg-white! border-slate-200! fill-slate-600! shadow-sm" />
-            </ReactFlow>
+            <GraphCanvas nodes={nodes} edges={edges} />
+          )}
+
+          {selectedCourse && !loading && !generating && !error && nodes.length === 0 && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 px-6 text-center">
+              <Network className="w-14 h-14 text-slate-200" />
+              <div>
+                <p className="font-bold text-slate-700">Chưa có cây kỹ năng cho môn này</p>
+                <p className="text-sm text-slate-500 mt-1">Hãy để AI tạo lộ trình cá nhân hóa.</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleRegenerate}
+                className="bg-blue-600 text-white px-6 py-3 rounded-full font-bold text-sm hover:bg-blue-700 transition flex items-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" /> Tạo lộ trình
+              </button>
+            </div>
           )}
 
           {/* AI Insight Overlay */}
           {graphData?.ai_insight && !loading && !generating && (
             <div className="absolute bottom-6 right-6 z-10 max-w-sm">
-              <div className="bg-white p-5 rounded-3xl border border-purple-100 shadow-[0_8px_30px_rgb(0,0,0,0.08)] animate-in slide-in-from-bottom-4 duration-500">
+              <div className="bg-white p-5 rounded-3xl border border-purple-100 shadow-[0_8px_30px_rgb(0,0,0,0.08)] animate-in slide-in-from-bottom-4 duration-200">
                 <div className="flex items-center gap-2 mb-3">
                   <Brain className="w-5 h-5 text-purple-600" />
                   <h3 className="font-bold text-slate-800 text-sm">AI Insight</h3>

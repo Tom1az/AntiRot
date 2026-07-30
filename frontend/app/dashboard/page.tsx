@@ -24,7 +24,8 @@ export default function DashboardPage() {
     if (isTeacher || !studentId) return;
 
     const fetchData = async () => {
-      setLoading(true);
+      // Chỉ blank UI lần đầu — lần sau giữ data cũ (cache)
+      if (!dashboard) setLoading(true);
       setError(null);
       try {
         const [dashData, picksData] = await Promise.all([
@@ -53,12 +54,11 @@ export default function DashboardPage() {
   // ---------------------------------------------------------------------------
   // LOADING STATE — Skeleton + "Đang đánh thức hệ thống..."
   // ---------------------------------------------------------------------------
-  if (loading) {
+  if (loading && !dashboard) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 animate-in fade-in duration-500">
+      <div className="flex flex-col items-center justify-center h-full gap-4 animate-in fade-in duration-150">
         <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
-        <p className="text-slate-500 font-semibold text-lg">Đang đánh thức hệ thống...</p>
-        <p className="text-slate-400 text-sm">Server Render Free có thể mất 30-50 giây để khởi động.</p>
+        <p className="text-slate-500 font-semibold text-lg">Đang tải dashboard...</p>
       </div>
     );
   }
@@ -68,7 +68,7 @@ export default function DashboardPage() {
   // ---------------------------------------------------------------------------
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 animate-in fade-in duration-500">
+      <div className="flex flex-col items-center justify-center h-full gap-4 animate-in fade-in duration-150">
         <AlertTriangle className="w-12 h-12 text-red-400" />
         <p className="text-red-600 font-bold text-lg">Lỗi kết nối</p>
         <p className="text-slate-500 text-sm max-w-md text-center">{error}</p>
@@ -108,7 +108,7 @@ export default function DashboardPage() {
 
   // STUDENT DASHBOARD UI
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 max-w-6xl mx-auto">
+    <div className="space-y-8 animate-in fade-in duration-150 max-w-6xl mx-auto">
 
       {/* Hero Section */}
       <div className="bg-blue-600 rounded-4xl p-10 text-white relative overflow-hidden shadow-md">
@@ -142,7 +142,7 @@ export default function DashboardPage() {
               <button onClick={() => router.push('/knowledge-graph')} className="text-blue-600 font-bold text-sm hover:underline">Xem tất cả</button>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {progress.length > 0 ? (
                 progress.slice(0, 3).map((p, i) => {
                   const c = courseColors[i % courseColors.length];
@@ -167,27 +167,25 @@ export default function DashboardPage() {
                   );
                 })
               ) : (
-                <div className="col-span-3 text-center py-8 text-slate-400 font-medium">
+                <div className="sm:col-span-2 lg:col-span-3 text-center py-8 text-slate-400 font-medium">
                   Chưa có dữ liệu môn học nào.
                 </div>
               )}
             </div>
           </div>
 
-          {/* Personalized Learning Path */}
+          {/* Personalized Learning Path — từ dữ liệu progress thật */}
           <div className="bg-white rounded-4xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white">
             <div className="flex justify-between items-center mb-8">
-              <div>
-                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-3">
-                  Lộ trình học cá nhân
-                  <span className="bg-blue-50 text-blue-600 text-xs px-2 py-1 rounded-md font-semibold">Module {Math.min(progress.length, 12)} / 12</span>
-                </h2>
-              </div>
+              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-3">
+                Lộ trình học cá nhân
+                <span className="bg-blue-50 text-blue-600 text-xs px-2 py-1 rounded-md font-semibold">{progress.length} môn</span>
+              </h2>
             </div>
 
             <div className="mb-8">
               <div className="flex justify-between text-sm font-bold text-slate-600 mb-2">
-                <span>Tiến độ thành thạo</span>
+                <span>Tiến độ thành thạo trung bình</span>
                 <span>{avgMastery}%</span>
               </div>
               <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
@@ -195,46 +193,30 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Timeline */}
-            <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
-              {/* Step 1 */}
-              <div className="relative flex items-start gap-4">
-                <div className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center shrink-0 z-10">
-                  <CheckCircle className="w-5 h-5 text-green-500" fill="currentColor" stroke="white" />
-                </div>
-                <div className="pt-1">
-                  <h4 className="font-bold text-slate-800">Nền tảng Tư duy Phản biện</h4>
-                  <p className="text-xs font-semibold text-slate-500 mt-1">Thành thạo ngày 12/10 • 4 bài học</p>
-                </div>
-              </div>
-              {/* Step 2 */}
-              <div className="relative flex items-start gap-4">
-                <div className="w-10 h-10 bg-white border-2 border-blue-600 rounded-full flex items-center justify-center shrink-0 z-10 shadow-sm shadow-blue-200">
-                  <PlayCircle className="w-5 h-5 text-blue-600" />
-                </div>
-                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex-1">
-                  <h4 className="font-bold text-blue-900">Logic & Suy luận Nâng cao</h4>
-                  <p className="text-xs font-semibold text-blue-700 mt-1 mb-3">Đang học • Bài 5: Tam đoạn luận</p>
-                  <div className="flex gap-2">
-                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                      <BookOpen className="w-4 h-4 text-blue-600" />
+            <div className="space-y-4">
+              {progress.length > 0 ? (
+                progress.slice(0, 5).map((p) => {
+                  const done = p.mastery_score >= 70;
+                  const active = !done && p.progress_pct > 0;
+                  return (
+                    <div key={p.id} className={`relative flex items-start gap-4 ${!done && !active ? 'opacity-60' : ''}`}>
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 z-10 ${
+                        done ? 'bg-green-50' : active ? 'bg-white border-2 border-blue-600' : 'bg-slate-100'
+                      }`}>
+                        {done ? <CheckCircle className="w-5 h-5 text-green-500" /> : active ? <PlayCircle className="w-5 h-5 text-blue-600" /> : <Lock className="w-4 h-4 text-slate-400" />}
+                      </div>
+                      <div className={`flex-1 pt-1 ${active ? 'bg-blue-50 border border-blue-100 rounded-2xl p-4' : ''}`}>
+                        <h4 className={`font-bold ${active ? 'text-blue-900' : 'text-slate-800'}`}>{p.course_module_name}</h4>
+                        <p className={`text-xs font-semibold mt-1 ${active ? 'text-blue-700' : 'text-slate-500'}`}>
+                          {done ? `Thành thạo • ${p.mastery_score}%` : active ? `Đang học • Tiến độ ${p.progress_pct}%` : `Chưa bắt đầu • Mastery ${p.mastery_score}%`}
+                        </p>
+                      </div>
                     </div>
-                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                      <Target className="w-4 h-4 text-blue-600" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-              {/* Step 3 */}
-              <div className="relative flex items-start gap-4 opacity-50">
-                <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center shrink-0 z-10">
-                  <Lock className="w-4 h-4 text-slate-400" />
-                </div>
-                <div className="pt-1">
-                  <h4 className="font-bold text-slate-600">Phương pháp Ra quyết định</h4>
-                  <p className="text-xs font-semibold text-slate-400 mt-1">Đã khoá • Hoàn thành Logic trước</p>
-                </div>
-              </div>
+                  );
+                })
+              ) : (
+                <p className="text-slate-400 text-sm font-medium text-center py-6">Chưa có lộ trình — hãy bắt đầu một môn học.</p>
+              )}
             </div>
           </div>
 
@@ -283,7 +265,7 @@ export default function DashboardPage() {
             const StatusIcon = level === 'good' ? CheckCircle : level === 'warning' ? AlertTriangle : Brain;
 
             return (
-              <div className={`${config.bg} rounded-4xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border ${config.border} p-8 text-center flex flex-col items-center transition-colors duration-500`}>
+              <div className={`${config.bg} rounded-4xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border ${config.border} p-8 text-center flex flex-col items-center transition-colors duration-200`}>
                 {/* Status Badge */}
                 <div className={`inline-flex items-center gap-2 ${config.iconBg} px-4 py-2 rounded-full mb-4`}>
                   <StatusIcon className={`w-4 h-4 ${config.iconColor}`} />
@@ -401,7 +383,7 @@ function TeacherDashboard({ router }: { router: any }) {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 animate-in fade-in duration-500">
+      <div className="flex flex-col items-center justify-center h-full gap-4 animate-in fade-in duration-150">
         <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
         <p className="text-slate-500 font-semibold text-lg">Đang tải dữ liệu tổng quan...</p>
       </div>
@@ -410,7 +392,7 @@ function TeacherDashboard({ router }: { router: any }) {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 animate-in fade-in duration-500">
+      <div className="flex flex-col items-center justify-center h-full gap-4 animate-in fade-in duration-150">
         <AlertTriangle className="w-12 h-12 text-red-400" />
         <p className="text-red-600 font-bold text-lg">Lỗi kết nối</p>
         <p className="text-slate-500 text-sm">{error}</p>
@@ -422,14 +404,14 @@ function TeacherDashboard({ router }: { router: any }) {
   const greeting = hour < 12 ? 'Chào buổi sáng' : hour < 18 ? 'Chào buổi chiều' : 'Chào buổi tối';
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 max-w-6xl mx-auto">
+    <div className="space-y-8 animate-in fade-in duration-150 max-w-6xl mx-auto">
       {/* Hero Section */}
-      <div className="bg-blue-800 rounded-4xl p-10 text-white relative overflow-hidden shadow-md">
+      <div className="bg-purple-800 rounded-4xl p-10 text-white relative overflow-hidden shadow-md">
         <div className="relative z-10 max-w-2xl">
           <h1 className="text-4xl font-bold mb-3">{greeting}, Thầy/Cô {user?.full_name || ''}!</h1>
-          <p className="text-blue-200 mb-8 max-w-lg text-lg">Hôm nay lớp học của chúng ta có gì mới? Hãy xem các thông báo và cảnh báo từ hệ thống Socratic.</p>
-          <div className="flex gap-4">
-            <button onClick={() => router.push('/Analytics')} className="bg-white text-blue-800 px-6 py-3 rounded-full font-bold text-sm hover:bg-slate-50 transition shadow-sm">Xem Phân tích Lớp học</button>
+          <p className="text-purple-200 mb-8 max-w-lg text-lg">Hôm nay lớp học của chúng ta có gì mới? Hãy xem các thông báo và cảnh báo từ hệ thống Socratic.</p>
+          <div className="flex flex-wrap gap-4">
+            <button onClick={() => router.push('/Analytics')} className="bg-white text-purple-800 px-6 py-3 rounded-full font-bold text-sm hover:bg-slate-50 transition shadow-sm">Xem Phân tích Lớp học</button>
             <button onClick={() => router.push('/Quiz-centre')} className="border border-white/30 text-white hover:bg-white/10 px-6 py-3 rounded-full font-bold text-sm transition">Tạo Bộ câu hỏi mới</button>
           </div>
         </div>

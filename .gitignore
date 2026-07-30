@@ -65,3 +65,9 @@ Thumbs.db
 *.ntvs*
 *.njsproj
 *.sln
+
+.next/
+*.swp
+*.swo
+*.exe
+.coverage

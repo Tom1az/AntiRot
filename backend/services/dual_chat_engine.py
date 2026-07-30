@@ -29,7 +29,7 @@ AGENT1_MODEL_NAME = os.getenv("AGENT1_MODEL_NAME", "socratic-coach")
 AGENT2_MAX_RETRIES = int(os.getenv("AGENT2_MAX_RETRIES", "3"))
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-gemini_model = genai.GenerativeModel('gemini-2.0-flash')
+gemini_model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-flash-latest"))
 
 # =============================================================================
 # SYSTEM PROMPTS
@@ -257,7 +257,7 @@ async def dual_agent_chat(
                     validation_score=0
                 )
             
-        except httpx.HTTPError as e:
+        except (httpx.HTTPError, httpx.RequestError) as e:
             # Agent 1 không kết nối được → fallback ngay sang Agent 2
             print(f"⚠️ Agent 1 connection error: {e}. Falling back to Agent 2.")
             break

@@ -71,6 +71,41 @@ def get_student_dashboard(student_id: uuid.UUID, db: Session = Depends(get_db)):
         "active_alerts": alerts
     }
 
+# Đáp án đúng cho ngân hàng câu hỏi mẫu (id → answer text)
+TEACHER_QUIZ_ANSWERS = {
+    101: "Stack", 102: "O(1)", 103: "Lập lịch tiến trình CPU", 104: "O(1)", 105: "Đã được sắp xếp",
+    106: "Queue", 107: "Mảng đã được sắp xếp sẵn", 108: "Tạo một Linked List tại index bị đụng độ",
+    109: "Merge Sort", 110: "Mảng tăng dần", 111: "Có trọng số âm",
+    112: "Tính toán lại các bài toán con bị trùng lặp", 113: "Tự động cân bằng chiều cao sau khi chèn/xóa",
+    114: "O(L)", 115: "Tìm đường đi ngắn nhất giữa mọi cặp đỉnh",
+    201: "Reference không thể trỏ sang đối tượng khác sau khi đã khởi tạo", 202: "Đa hình (Polymorphism)",
+    203: "Bộ nhớ bị rò rỉ (Memory Leak)", 204: "Không có kiểu trả về", 205: "Public",
+    206: "Luôn luôn CÓ, nếu lớp đó được kế thừa", 207: "Compile time (Lúc biên dịch)",
+    208: "Cấp phát một vùng nhớ mới lớn hơn, copy dữ liệu cũ sang và xóa vùng nhớ cũ",
+    209: "Pass-by-value copy dữ liệu, Pass-by-reference chia sẻ cùng một ô nhớ",
+    210: "Hàm đó không được phép thay đổi các thuộc tính của object gọi nó",
+    211: "Không thể copy, chỉ có thể move",
+    212: "Ép kiểu đối tượng thành rvalue reference (&&) để kích hoạt Move Constructor",
+    213: "Dùng std::weak_ptr",
+    214: "new vừa cấp phát vùng nhớ vừa gọi Constructor, malloc chỉ cấp bộ nhớ rỗng",
+    215: "Chụp tất cả các biến bên ngoài bằng giá trị (Copy)",
+    301: "Blocked/Waiting (Chờ đợi)",
+    302: "Lưu trạng thái tiến trình cũ và nạp trạng thái tiến trình mới vào CPU",
+    303: "Phần mềm hệ thống trung gian giữa phần cứng và người dùng",
+    304: "Cho phép chạy các chương trình có kích thước lớn hơn dung lượng RAM thực tế",
+    305: "Tiến trình người dùng cần yêu cầu HĐH làm một việc mà nó không có quyền (VD: đọc file)",
+    306: "Phân bổ cho mỗi tiến trình một khoảng thời gian bằng nhau (Time Quantum)",
+    307: "HĐH dành nhiều thời gian để swap (đổi trang) hơn là thực thi tiến trình",
+    308: "Mutex chỉ có 1 quyền sở hữu (lock/unlock), Semaphore là một bộ đếm đếm số lượng tài nguyên",
+    309: "Page Number và Page Offset",
+    310: "Preemptive scheduling (Định thời đoạt quyền)",
+    311: "Ngăn chặn Deadlock (Deadlock Avoidance) bằng cách kiểm tra trạng thái an toàn",
+    312: "FIFO (First In First Out)",
+    313: "Bộ nhớ Cache phần cứng siêu tốc dùng để lưu bảng phân trang (Page Table) gần nhất",
+    314: "Tính ổn định và bảo mật cao do chỉ giữ các chức năng tối thiểu ở Kernel Mode",
+    315: "Tiến trình độ ưu tiên cao phải đợi tiến trình độ ưu tiên thấp nhả tài nguyên (Mutex)",
+}
+
 # --- FRAME 3: QUIZ CENTER ---
 @student.get("/quiz/{topic}/teacher-questions")
 def get_quiz_questions(topic: str):
@@ -148,7 +183,11 @@ def get_quiz_questions(topic: str):
     }
     if topic_key not in quiz_db:
         raise HTTPException(status_code=404, detail="Topic chưa có câu hỏi mẫu")
-    return {"topic": topic, "type": "teacher_assigned", "questions": quiz_db[topic_key]}
+    questions = [
+        {**q, "answer": TEACHER_QUIZ_ANSWERS.get(q["id"], q["options"][0])}
+        for q in quiz_db[topic_key]
+    ]
+    return {"topic": topic, "type": "teacher_assigned", "questions": questions}
 
 @student.get("/{student_id}/quiz/{topic}/ai-questions")
 async def get_ai_adaptive_quiz(

@@ -49,11 +49,11 @@ const SkillNode = ({ data }: SkillNodeProps) => {
         `}
       >
         {isRecommended ? (
-          <Star className="w-6 h-6 animate-pulse" />
+          <Star className="w-6 h-6" />
         ) : isMastered ? (
           <CheckCircle className="w-6 h-6" />
         ) : isInProgress ? (
-          <Orbit className="w-6 h-6 animate-spin-slow" />
+          <Orbit className="w-6 h-6" />
         ) : (
           <Lock className="w-5 h-5" />
         )}

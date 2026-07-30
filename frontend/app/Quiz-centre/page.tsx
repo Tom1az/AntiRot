@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { 
   getTeacherQuestions, getAIQuestions, submitQuiz, getStudentDashboard, 
@@ -66,7 +66,6 @@ export default function QuizCentrePage() {
 
   // Fetch questions when topic or type changes
   const fetchQuestions = async () => {
-    setLoading(true);
     setError(null);
     setCurrentIdx(0);
     setSelectedAnswer(null);
@@ -81,22 +80,21 @@ export default function QuizCentrePage() {
 
     try {
       if (quizType === 'teacher') {
+        // Đồng bộ local — không cần spinner full
         if (selectedQuizId) {
           const quiz = assignedQuizzes.find(q => q.id === selectedQuizId);
-          if (quiz) {
-            setQuestions(quiz.questions);
-          } else {
-            setQuestions([]);
-          }
+          setQuestions(quiz?.questions || []);
         } else {
           setQuestions([]);
         }
-      } else {
-        const data = await getAIQuestions(studentId, selectedTopic, 5);
-        setQuestions(data.questions);
-        setWeaknessSummary(data.weakness_summary || null);
-        setStudyMaterials(data.study_materials || []);
+        return;
       }
+
+      setLoading(true);
+      const data = await getAIQuestions(studentId, selectedTopic, 5);
+      setQuestions(data.questions);
+      setWeaknessSummary(data.weakness_summary || null);
+      setStudyMaterials(data.study_materials || []);
     } catch (err: any) {
       setError(err.message);
       setQuestions([]);
@@ -109,15 +107,33 @@ export default function QuizCentrePage() {
     if (!isTeacher) {
       fetchQuestions();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTopic, quizType, isTeacher, selectedQuizId]);
 
+  // Khi list quiz giao về — sync câu hỏi nếu đang chọn teacher quiz
+  useEffect(() => {
+    if (isTeacher || quizType !== 'teacher' || !selectedQuizId) return;
+    const quiz = assignedQuizzes.find((q) => q.id === selectedQuizId);
+    if (quiz) setQuestions(quiz.questions || []);
+  }, [assignedQuizzes, selectedQuizId, quizType, isTeacher]);
+
+  const quizzesBySubject = useMemo(() => {
+    return assignedQuizzes.reduce((acc, q) => {
+      const match = q.topic_name.match(/^\[(.*?)\]/);
+      const subject = match ? match[1] : 'Khác';
+      if (!acc[subject]) acc[subject] = [];
+      acc[subject].push(q);
+      return acc;
+    }, {} as Record<string, any[]>);
+  }, [assignedQuizzes]);
+
   const currentQ = questions[currentIdx];
+  const getCorrectAnswer = (q: QuizQuestion) => q.answer || q.options[0];
 
   const handleSubmitAnswer = () => {
     if (!selectedAnswer || !currentQ) return;
     setIsSubmitted(true);
-    // Đáp án đúng là option đầu tiên (index 0) theo cách backend cấu trúc
-    const correct = selectedAnswer === currentQ.options[0];
+    const correct = selectedAnswer === getCorrectAnswer(currentQ);
     setIsCorrect(correct);
     if (correct) setCorrectCount((c) => c + 1);
     else setIncorrectCount((c) => c + 1);
@@ -159,10 +175,10 @@ export default function QuizCentrePage() {
   }
 
   return (
-    <div className="h-full flex flex-col gap-6 animate-in fade-in duration-500">
+    <div className="h-full flex flex-col gap-6 animate-in fade-in duration-150">
       
       {/* Top Header Section */}
-      <div className="flex justify-between items-end">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4">
         <div>
           <div className="flex items-center gap-3 mb-2">
              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white">
@@ -185,10 +201,10 @@ export default function QuizCentrePage() {
         </div>
       </div>
 
-      <div className="flex gap-6 flex-1 h-[600px]">
+      <div className="flex flex-col lg:flex-row gap-6 flex-1 lg:h-[600px]">
          
          {/* LEFT LIST: Topic & Quiz Type Selector */}
-         <div className="w-80 bg-white rounded-4xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white flex flex-col overflow-hidden">
+         <div className="w-full lg:w-80 shrink-0 bg-white rounded-4xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white flex flex-col overflow-hidden max-h-[320px] lg:max-h-none">
             <div className="p-6 border-b">
                <h3 className="font-bold text-slate-800 flex items-center gap-2">
                  <Activity className="w-5 h-5 text-blue-600" /> Chủ đề Quiz
@@ -238,15 +254,7 @@ export default function QuizCentrePage() {
                  )
                ) : (
                  assignedQuizzes.length > 0 ? (
-                   Object.entries(
-                     assignedQuizzes.reduce((acc, q) => {
-                       const match = q.topic_name.match(/^\[(.*?)\]/);
-                       const subject = match ? match[1] : 'Khác';
-                       if (!acc[subject]) acc[subject] = [];
-                       acc[subject].push(q);
-                       return acc;
-                     }, {} as Record<string, any[]>)
-                   ).map(([subject, quizzes]) => (
+                   Object.entries(quizzesBySubject).map(([subject, quizzes]) => (
                      <div key={subject} className="mb-6">
                         <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
                            <span className="w-1 h-1 rounded-full bg-slate-300"></span> {subject}
@@ -323,7 +331,7 @@ export default function QuizCentrePage() {
 
                    {/* AI Weakness Analysis */}
                    {quizType === 'ai' && weaknessSummary && currentIdx === 0 && (
-                      <div className="mb-8 p-6 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-3xl border border-purple-100 shadow-sm animate-in slide-in-from-top-4 duration-500">
+                      <div className="mb-8 p-6 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-3xl border border-purple-100 shadow-sm animate-in slide-in-from-top-4 duration-200">
                          <div className="flex items-start gap-4">
                             <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm shrink-0">
                                <Brain className="w-6 h-6 text-purple-600" />
@@ -355,7 +363,7 @@ export default function QuizCentrePage() {
                    </div>
 
                    {/* Options */}
-                   <div className="grid grid-cols-2 gap-4 max-w-2xl mx-auto w-full mb-auto">
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto w-full mb-auto">
                       {currentQ.options.map((option, i) => {
                         const letter = String.fromCharCode(65 + i); // A, B, C, D
                         return (
@@ -384,7 +392,7 @@ export default function QuizCentrePage() {
                    
                    {/* AI Feedback */}
                    {isSubmitted && (
-                      <div className={`mt-6 p-6 rounded-2xl border-2 ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-purple-50 border-purple-200'} animate-in slide-in-from-bottom-4 duration-500`}>
+                      <div className={`mt-6 p-6 rounded-2xl border-2 ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-purple-50 border-purple-200'} animate-in slide-in-from-bottom-4 duration-200`}>
                          <div className="flex gap-4 items-start">
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isCorrect ? 'bg-green-100 text-green-600' : 'bg-purple-100 text-purple-600'}`}>
                                {isCorrect ? <CheckCircle className="w-6 h-6" /> : <Bot className="w-6 h-6" />}
@@ -396,7 +404,7 @@ export default function QuizCentrePage() {
                                <p className={`text-sm leading-relaxed ${isCorrect ? 'text-green-700' : 'text-purple-800'}`}>
                                  {isCorrect 
                                    ? 'Tuyệt vời! Tiến độ đã được cập nhật. Tiếp tục phát huy!' 
-                                   : `Đáp án đúng là: "${currentQ.options[0]}". ${currentQ.hint}`}
+                                   : `Đáp án đúng là: "${getCorrectAnswer(currentQ)}". ${currentQ.hint}`}
                                </p>
                             </div>
                          </div>
@@ -477,7 +485,7 @@ export default function QuizCentrePage() {
                    }[level];
                    const Icon = level === 'good' ? ShieldCheck : level === 'warning' ? AlertTriangle : Brain;
                    return (
-                     <div className={`${cfg.bg} rounded-3xl border ${cfg.border} p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-colors duration-500`}>
+                     <div className={`${cfg.bg} rounded-3xl border ${cfg.border} p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-colors duration-200`}>
                        <div className="flex items-center gap-2 mb-3">
                          <div className={`w-8 h-8 rounded-full ${cfg.iconBg} flex items-center justify-center`}>
                            <Icon className={`w-4 h-4 ${cfg.iconColor}`} />
@@ -489,7 +497,7 @@ export default function QuizCentrePage() {
                        </div>
                        <p className="text-xs text-slate-600 font-medium leading-relaxed mb-4">{cfg.msg}</p>
                        <div className={`w-full h-2 rounded-full ${cfg.barBg}`}>
-                         <div className={`h-full rounded-full transition-all duration-500 ${cfg.barFill}`} style={{ width: `${Math.min(100, hintsUsed * 20)}%` }}></div>
+                         <div className={`h-full rounded-full transition-all duration-200 ${cfg.barFill}`} style={{ width: `${Math.min(100, hintsUsed * 20)}%` }}></div>
                        </div>
                        <p className="text-[10px] text-slate-400 font-bold mt-2 uppercase tracking-wider">Gợi ý đã dùng: {hintsUsed}</p>
                      </div>
@@ -589,7 +597,7 @@ function TeacherQuizGenerator() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto h-full flex flex-col gap-6 animate-in fade-in duration-500 w-full pt-10">
+    <div className="max-w-4xl mx-auto h-full flex flex-col gap-6 animate-in fade-in duration-150 w-full pt-10">
       <div className="flex items-center gap-3 mb-4">
         <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white">
           <Bot className="w-6 h-6" />

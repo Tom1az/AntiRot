@@ -6,6 +6,7 @@ from routers.student_route import student
 from routers.teacher_route import teacher
 from routers.skill_route import skill_tree
 from routers.auth_route import auth
+import os
 
 Base.metadata.create_all(bind=engine)
 
@@ -17,9 +18,11 @@ app = FastAPI(
 
 # 2. Cấu hình CORS (Gatekeeper cho phép React kết nối)
 # allow_origins=["*"] cho phép tất cả các nguồn truy cập, cực kỳ hữu ích khi demo.
+_default_origins = "http://localhost:3000,http://127.0.0.1:3000"
+origins = [o.strip() for o in os.getenv("CORS_ORIGINS", _default_origins).split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -40,5 +43,8 @@ def health_check():
         "version": "1.0.0"
     }
 
+@app.get("/health_check")
+def CI_health_check():
+    return {"status": "OK"}
 # 4. Lưu ý khi chạy lệnh khởi động trên Render:
 # Lệnh Start Command sẽ là: uvicorn main:app --host 0.0.0.0 --port 10000

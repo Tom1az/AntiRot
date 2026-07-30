@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import {
   getClassAnalytics, getTeacherDashboardSummary, searchStudents,
@@ -15,7 +15,7 @@ export default function AnalyticsPage() {
   const isTeacher = user?.role === 'teacher';
 
   return (
-    <div className="h-full flex flex-col gap-8 animate-in fade-in duration-500 max-w-7xl mx-auto">
+    <div className="h-full flex flex-col gap-8 animate-in fade-in duration-150 max-w-7xl mx-auto">
       {isTeacher ? <TeacherAnalytics /> : <StudentAnalytics />}
     </div>
   );
@@ -29,10 +29,12 @@ function TeacherAnalytics() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [students, setStudents] = useState<User[]>([]);
+  const [allStudents, setAllStudents] = useState<User[]>([]);
   const [totalStudents, setTotalStudents] = useState(0);
   const [alerts, setAlerts] = useState<AlertInsight[]>([]);
   const [riskDistribution, setRiskDistribution] = useState<Record<string, number>>({});
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -46,6 +48,7 @@ function TeacherAnalytics() {
         setRiskDistribution(analytics.risk_distribution);
         setTotalStudents(summary.total_students);
         setAlerts(summary.recent_alerts);
+        setAllStudents(studentList);
         setStudents(studentList);
       } catch (err: any) {
         setError(err.message);
@@ -56,35 +59,51 @@ function TeacherAnalytics() {
     loadData();
   }, []);
 
-  // Search handler
-  const handleSearch = async (name: string) => {
+  const handleSearch = useCallback((name: string) => {
     setSearchQuery(name);
-    try {
-      const results = await searchStudents(name);
-      setStudents(results);
-    } catch { }
-  };
+    const q = name.trim().toLowerCase();
+    // Lọc local ngay — không re-render chart nặng do API
+    setStudents(
+      !q
+        ? allStudents
+        : allStudents.filter(
+            (s) =>
+              s.full_name?.toLowerCase().includes(q) ||
+              s.username?.toLowerCase().includes(q),
+          ),
+    );
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    // Debounce gọi API nếu cần sync server (300ms)
+    searchTimer.current = setTimeout(async () => {
+      try {
+        const results = await searchStudents(name);
+        setStudents(results);
+      } catch {}
+    }, 300);
+  }, [allStudents]);
 
-  // Build pie data from risk_distribution
   const riskColorMap: Record<string, { name: string; color: string }> = {
     optimal: { name: 'Optimal Growth', color: '#10B981' },
     moderate: { name: 'Moderate Slump', color: '#3B82F6' },
     high_risk: { name: 'High Risk', color: '#EF4444' },
   };
-  const pieData = Object.entries(riskDistribution).map(([key, value]) => ({
-    name: riskColorMap[key]?.name || key,
-    value,
-    color: riskColorMap[key]?.color || '#94A3B8',
-  }));
-  const totalInPie = pieData.reduce((s, d) => s + d.value, 0);
+  const pieData = useMemo(
+    () =>
+      Object.entries(riskDistribution).map(([key, value]) => ({
+        name: riskColorMap[key]?.name || key,
+        value,
+        color: riskColorMap[key]?.color || '#94A3B8',
+      })),
+    [riskDistribution],
+  );
+  const totalInPie = useMemo(() => pieData.reduce((s, d) => s + d.value, 0), [pieData]);
   const highRiskCount = riskDistribution['high_risk'] || 0;
 
-  if (loading) {
+  if (loading && allStudents.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
         <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
-        <p className="text-slate-500 font-semibold text-lg">Đang đánh thức hệ thống...</p>
-        <p className="text-slate-400 text-sm">Server Render Free có thể mất 30-50 giây.</p>
+        <p className="text-slate-500 font-semibold text-lg">Đang tải analytics...</p>
       </div>
     );
   }
@@ -101,12 +120,12 @@ function TeacherAnalytics() {
 
   return (
     <>
-      <div className="flex justify-between items-end">
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-end gap-4">
         <div>
           <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">INSIGHT DASHBOARD</p>
           <h1 className="text-3xl font-bold text-slate-800">Class Analytics</h1>
         </div>
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-3">
           <div className="bg-white border rounded-lg px-4 py-2 flex items-center gap-2">
             <Search className="w-4 h-4 text-slate-400" />
             <input
@@ -117,26 +136,36 @@ function TeacherAnalytics() {
               className="outline-none text-sm font-semibold text-slate-600 bg-transparent w-40"
             />
           </div>
-          <button className="bg-white border rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm flex items-center gap-2">
+          <button
+            type="button"
+            disabled
+            title="Sắp có"
+            className="bg-white border rounded-lg px-4 py-2 text-sm font-semibold text-slate-400 shadow-sm flex items-center gap-2 cursor-not-allowed opacity-70"
+          >
             <Calendar className="w-4 h-4" /> Last 30 Days
           </button>
-          <button className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-bold shadow-sm flex items-center gap-2">
+          <button
+            type="button"
+            disabled
+            title="Sắp có"
+            className="bg-blue-600/50 text-white rounded-lg px-4 py-2 text-sm font-bold shadow-sm flex items-center gap-2 cursor-not-allowed"
+          >
             <Download className="w-4 h-4" /> Export Report
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Students" value={String(totalStudents)} subtitle="" icon={<Activity className="w-4 h-4 text-blue-600" />} />
         <StatCard label="Risk Categories" value={String(pieData.length)} subtitle="Active categories" icon={<Activity className="w-4 h-4 text-green-600" />} />
         <StatCard label="High Risk" value={String(highRiskCount)} subtitle="" icon={<AlertCircle className="w-4 h-4 text-red-500" />} highlight="red" />
         <StatCard label="Alerts" value={String(alerts.length)} subtitle="Intervention Needed" icon={<AlertCircle className="w-4 h-4 text-orange-500" />} highlight="bg-blue-600 text-white" />
       </div>
 
-      <div className="grid grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
         {/* Donut Chart */}
-        <div className="col-span-4 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white p-6 flex flex-col items-center">
+        <div className="lg:col-span-4 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white p-6 flex flex-col items-center">
           <h3 className="font-bold text-slate-800 w-full mb-4">Brainrot Risk Distribution</h3>
           <div className="w-48 h-48 relative mb-6">
             {pieData.length > 0 ? (
@@ -169,7 +198,7 @@ function TeacherAnalytics() {
         </div>
 
         {/* Student Performance Table */}
-        <div className="col-span-8 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white p-6 flex flex-col overflow-hidden">
+        <div className="lg:col-span-8 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white p-6 flex flex-col overflow-hidden">
           <div className="flex justify-between items-center mb-6">
             <h3 className="font-bold text-slate-800">Student Performance</h3>
             <span className="text-slate-400 text-sm font-medium">{students.length} results</span>
@@ -238,8 +267,13 @@ function TeacherAnalytics() {
               ? `${highRiskCount} students have been flagged as high-risk for AI dependency.`
               : 'No students currently require intervention.'}
           </p>
-          <button className="bg-white text-blue-800 px-5 py-2.5 text-sm font-bold rounded-xl shadow-sm relative z-10 hover:bg-blue-50 transition">
-            Send Class Alert 🔔
+          <button
+            type="button"
+            disabled
+            title="Sắp có"
+            className="bg-white/80 text-blue-800/70 px-5 py-2.5 text-sm font-bold rounded-xl shadow-sm relative z-10 cursor-not-allowed"
+          >
+            Send Class Alert
           </button>
         </div>
       </div>
@@ -289,7 +323,7 @@ function StudentAnalytics({ overrideStudentId }: { overrideStudentId?: string })
 
   useEffect(() => {
     const loadData = async () => {
-      setLoading(true);
+      if (!profile) setLoading(true);
       try {
         const [dashData, quizData] = await Promise.all([
           getStudentDashboard(studentId),
@@ -304,14 +338,14 @@ function StudentAnalytics({ overrideStudentId }: { overrideStudentId?: string })
         setLoading(false);
       }
     };
-    loadData();
-  }, []);
+    if (studentId) loadData();
+  }, [studentId]);
 
-  if (loading) {
+  if (loading && !profile) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
         <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
-        <p className="text-slate-500 font-semibold">Đang đánh thức hệ thống...</p>
+        <p className="text-slate-500 font-semibold">Đang tải analytics...</p>
       </div>
     );
   }
@@ -355,15 +389,15 @@ function StudentAnalytics({ overrideStudentId }: { overrideStudentId?: string })
           </div>
         </div>
         <div className="flex gap-3">
-          <button className="bg-slate-100 text-slate-600 px-4 py-2 font-bold text-sm rounded-lg hover:bg-slate-200">Download Report</button>
-          <button className="bg-blue-600 text-white px-4 py-2 font-bold text-sm rounded-lg shadow hover:bg-blue-700">Schedule Review</button>
+          <button type="button" disabled title="Sắp có" className="bg-slate-100 text-slate-400 px-4 py-2 font-bold text-sm rounded-lg cursor-not-allowed">Download Report</button>
+          <button type="button" disabled title="Sắp có" className="bg-blue-600/50 text-white px-4 py-2 font-bold text-sm rounded-lg cursor-not-allowed">Schedule Review</button>
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
         {/* Performance Trend Chart */}
-        <div className="col-span-8 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white p-6 flex flex-col">
+        <div className="lg:col-span-8 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white p-6 flex flex-col">
           <h3 className="font-bold text-slate-800 mb-1">Quiz Performance History</h3>
           <p className="text-xs text-slate-500 font-semibold mb-8">Score per quiz attempt</p>
           <div className="flex-1 min-h-[250px]">
@@ -383,7 +417,7 @@ function StudentAnalytics({ overrideStudentId }: { overrideStudentId?: string })
         </div>
 
         {/* AI Dependency */}
-        <div className="col-span-4 bg-red-50/50 rounded-3xl border border-red-100 p-6 shadow-sm flex flex-col gap-6">
+        <div className="lg:col-span-4 bg-red-50/50 rounded-3xl border border-red-100 p-6 shadow-sm flex flex-col gap-6">
           <h3 className="font-bold text-red-600 flex items-center gap-2">
             <Bot className="w-5 h-5" /> AI Dependency
           </h3>

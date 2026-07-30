@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { postSocraticChat, getChatSessions, getStudentDashboard, postTeacherChat } from '@/services/apiClient';
 import type { ChatSession } from '@/types/api';
-import { Send, Bot, User, Bookmark, BrainCircuit, Target, Clock, History, Loader2, AlertTriangle, Network } from 'lucide-react';
+import { Send, Bot, User, BrainCircuit, Target, History, Loader2, AlertTriangle, Network, Clock } from 'lucide-react';
 
 interface ChatMessage {
   id: string;
@@ -38,14 +38,13 @@ export default function ChatTutorPage() {
     if (isTeacher || !studentId) return;
 
     const loadData = async () => {
-      setInitialLoading(true);
+      if (messages.length === 0) setInitialLoading(true);
       try {
         const [sessions, dashData] = await Promise.all([
           getChatSessions(studentId).catch(() => [] as ChatSession[]),
           getStudentDashboard(studentId).catch(() => null),
         ]);
 
-        // Convert chat sessions to flat messages
         if (sessions.length > 0) {
           const flatMessages: ChatMessage[] = [];
           sessions.forEach((session) => {
@@ -135,52 +134,46 @@ export default function ChatTutorPage() {
   }
 
   // Initial loading state
-  if (initialLoading) {
+  if (initialLoading && messages.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 animate-in fade-in duration-500">
+      <div className="flex flex-col items-center justify-center h-full gap-4 animate-in fade-in duration-150">
         <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
         <p className="text-slate-500 font-semibold text-lg">Đang tải lịch sử chat...</p>
-        <p className="text-slate-400 text-sm">Server có thể mất 30-50 giây để khởi động.</p>
       </div>
     );
   }
 
   // STUDENT MODE UI
   return (
-    <div className="flex gap-6 h-full animate-in fade-in duration-500">
+    <div className="flex flex-col lg:flex-row gap-6 h-full animate-in fade-in duration-150">
 
       {/* LEFT: MAIN CHAT PANEL */}
-      <div className="flex-1 bg-white rounded-4xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white flex flex-col overflow-hidden">
+      <div className="flex-1 min-w-0 bg-white rounded-4xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white flex flex-col overflow-hidden min-h-[420px]">
 
         {/* Chat Header */}
-        <div className="px-6 py-4 border-b flex justify-between items-center bg-white">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex justify-center items-center">
+        <div className="px-4 sm:px-6 py-4 border-b flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 bg-white">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 bg-blue-100 rounded-full flex justify-center items-center shrink-0">
               <Bot className="w-6 h-6 text-blue-600" />
             </div>
-            <div>
-              <h2 className="font-bold text-slate-800">Socratic Coach - Pushin' Your Thinkin'</h2>
+            <div className="min-w-0">
+              <h2 className="font-bold text-slate-800 truncate">Socratic Coach</h2>
               <p className="text-xs text-green-600 font-semibold flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span> Active curator in session
+                <span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span> Active session
               </p>
             </div>
           </div>
-          {/* Topic selector */}
-          <div className="flex items-center gap-3">
-            <select
-              value={topicName}
-              onChange={(e) => setTopicName(e.target.value)}
-              className="bg-slate-50 border rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-600 outline-none"
-            >
-              <option value="General">General</option>
-              <option value="DSA">DSA</option>
-              <option value="LTNC">LTNC (C++)</option>
-              <option value="HDH">Hệ Điều Hành</option>
-            </select>
-            <button className="flex items-center gap-2 text-sm font-semibold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition">
-              <Bookmark className="w-4 h-4" /> Save Chat
-            </button>
-          </div>
+          <select
+            value={topicName}
+            onChange={(e) => setTopicName(e.target.value)}
+            aria-label="Chủ đề chat"
+            className="bg-slate-50 border rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-blue-500/30"
+          >
+            <option value="General">General</option>
+            <option value="DSA">DSA</option>
+            <option value="LTNC">LTNC (C++)</option>
+            <option value="HDH">Hệ Điều Hành</option>
+          </select>
         </div>
 
         {/* Chat Messages */}
@@ -250,7 +243,7 @@ export default function ChatTutorPage() {
       </div>
 
       {/* RIGHT: CONTEXT & PROGRESS PANEL */}
-      <div className="w-80 flex flex-col gap-6">
+      <div className="w-full lg:w-80 shrink-0 flex flex-col gap-6">
 
         {/* Current Focus */}
         <div className="bg-white rounded-4xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white p-6">
@@ -266,44 +259,42 @@ export default function ChatTutorPage() {
           </div>
           <div className="pt-2">
             <div className="flex justify-between text-xs font-bold mb-2">
-              <span className="text-slate-500">Mastery Progress</span>
-              <span className="text-blue-600">68%</span>
+              <span className="text-slate-500">Study hours (tuần này)</span>
+              <span className="text-blue-600">{studyHours}h</span>
             </div>
             <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-              <div className="bg-blue-600 h-full rounded-full w-[68%]"></div>
+              <div
+                className="bg-blue-600 h-full rounded-full transition-all"
+                style={{ width: `${Math.min(100, (studyHours / 20) * 100)}%` }}
+              ></div>
             </div>
           </div>
         </div>
 
-        {/* Skill Tree Insight */}
-        <div className="bg-gradient-to-r from-cyan-900/10 to-blue-900/10 rounded-4xl border border-cyan-100 p-6 relative overflow-hidden shadow-[0_4px_20px_rgba(34,211,238,0.1)]">
-          <div className="absolute top-[-10px] right-[-10px] p-4 opacity-20">
-            <Network className="w-24 h-24 text-cyan-600" />
-          </div>
+        <div className="bg-gradient-to-r from-cyan-900/10 to-blue-900/10 rounded-4xl border border-cyan-100 p-6 relative overflow-hidden">
           <h3 className="font-bold mb-2 text-cyan-800 flex items-center gap-2">
-            <Network className="w-4 h-4" /> Skill Tree Insight
+            <Network className="w-4 h-4" /> Gợi ý học
           </h3>
           <p className="text-sm text-cyan-900 leading-relaxed font-medium relative z-10">
-            "💡 Gợi ý: Bạn đã thành thạo phần <strong>Array</strong> và <strong>Hash Tables</strong> trong Skill Tree. Hãy áp dụng kiến thức đó để tối ưu thời gian chạy của bài toán này xuống O(N) nhé!"
+            Đặt câu hỏi theo chủ đề <strong>{topicName}</strong>. Coach sẽ chỉ gợi mở — không đưa đáp án sẵn.
           </p>
         </div>
 
-        {/* Next Steps */}
         <div className="bg-white rounded-4xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white p-6">
           <h3 className="font-bold mb-4 text-slate-800">Next Steps</h3>
-          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 cursor-pointer hover:bg-blue-100 transition">
+          <a href="/knowledge-graph" className="block bg-blue-50 border border-blue-100 rounded-2xl p-4 hover:bg-blue-100 transition">
             <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">RECOMMENDED</p>
-            <p className="text-sm font-semibold text-slate-800">Practice Multi-step Equations</p>
-          </div>
+            <p className="text-sm font-semibold text-slate-800">Xem Knowledge Graph</p>
+          </a>
           <div className="flex justify-between mt-6 px-4">
-            <div className="text-center">
+            <a href="/knowledge-graph" className="text-center hover:opacity-80">
               <Target className="w-6 h-6 mx-auto text-slate-400 mb-1" />
               <p className="text-xs font-semibold text-slate-500">Skill Map</p>
-            </div>
-            <div className="text-center">
+            </a>
+            <a href="/Quiz-centre" className="text-center hover:opacity-80">
               <History className="w-6 h-6 mx-auto text-slate-400 mb-1" />
-              <p className="text-xs font-semibold text-slate-500">History</p>
-            </div>
+              <p className="text-xs font-semibold text-slate-500">Quiz</p>
+            </a>
           </div>
         </div>
 
@@ -382,7 +373,7 @@ function TeacherChat() {
   };
 
   return (
-    <div className="flex gap-6 h-full animate-in fade-in duration-500">
+    <div className="flex gap-6 h-full animate-in fade-in duration-150">
       {/* LEFT: MAIN CHAT PANEL */}
       <div className="flex-1 bg-white rounded-4xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white flex flex-col overflow-hidden max-w-5xl mx-auto">
         {/* Chat Header */}
