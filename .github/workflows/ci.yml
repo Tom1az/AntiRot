@@ -49,7 +49,7 @@ jobs:
 
       - name: Run pytest
         working-directory: backend
-        run: pytest -q
+        run: pytest -q tests
 
   docker:
     name: Build Docker images
