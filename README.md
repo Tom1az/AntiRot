@@ -1,5 +1,7 @@
 # AntiRot — AI Socratic LMS
 
+[![CI](https://github.com/Tom1az/AntiRot/actions/workflows/ci.yml/badge.svg)](https://github.com/Tom1az/AntiRot/actions/workflows/ci.yml)
+
 Nền tảng học tập giúp sinh viên giảm lệ thuộc AI và rèn tư duy theo phương pháp Socratic: AI chỉ hỏi gợi mở, không đưa đáp án sẵn.
 
 ## Tính năng
