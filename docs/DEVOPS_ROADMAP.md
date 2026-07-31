@@ -138,12 +138,12 @@ flowchart LR
 
 **Công việc:**
 
-- [ ] Tạo `.github/workflows/ci.yml` với các bước:
+- [x] Tạo `.github/workflows/ci.yml` với các bước:
   - checkout code
   - cài Python + dependencies (có cache)
   - chạy `pytest`
   - build Docker image (kiểm tra Dockerfile build được)
-- [ ] Thêm **badge** trạng thái CI vào README.
+- [x] Thêm **badge** trạng thái CI vào README.
 - [ ] Bật **branch protection** đơn giản: `main` yêu cầu CI xanh trước khi merge.
 - [ ] Hiểu & giải thích được: workflow, job, step, trigger (`on: push` / `pull_request`).
 
